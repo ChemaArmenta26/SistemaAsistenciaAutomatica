@@ -1,14 +1,13 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-
+import { connectDB } from "./config/db.js";
 import authRoutes from "./routes/auth.routes.js";
 import asistenciaRoutes from "./routes/asistencia.routes.js";
 import ubicacionRoutes from "./routes/ubicacion.routes.js";
-import { connectDB } from "./config/db.js";
 
 dotenv.config();
-connectDB();
+
 const app = express();
 
 // Middleware
@@ -20,6 +19,37 @@ app.use("/api/auth", authRoutes);
 app.use("/api/asistencia", asistenciaRoutes);
 app.use("/api/ubicacion", ubicacionRoutes);
 
-// Puerto
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+// Ruta de prueba
+app.get("/", (req, res) => {
+  res.json({ 
+    message: "API del Sistema de Asistencia funcionando",
+    endpoints: {
+      auth: "/api/auth",
+      asistencia: "/api/asistencia", 
+      ubicacion: "/api/ubicacion"
+    }
+  });
+});
+
+// Manejo de rutas no encontradas
+app.use((req, res) => {
+  res.status(404).json({ message: "Ruta no encontrada" });
+});
+
+// Inicializar servidor
+const startServer = async () => {
+  try {
+    await connectDB();
+    const PORT = process.env.PORT || 3000;
+    
+    app.listen(PORT, () => {
+      console.log(`Servidor corriendo en puerto ${PORT}`);
+      console.log(`API disponible en http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error("Error al iniciar servidor:", error);
+    process.exit(1);
+  }
+};
+
+startServer();
