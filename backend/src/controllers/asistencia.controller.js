@@ -8,11 +8,22 @@ export async function register(req, res) {
     }
 
     const result = await AsistenciaService.registrarAsistencia({ idAlumno, idGrupo, latitud, longitud, precision, fechaHora });
-    return res.status(201).json({
-      message: "Asistencia registrada",
-      asistencia: result.asistencia,
-      validaHorario: result.validaHorario,
-    });
+
+    if (result.exito) {
+        return res.status(201).json({
+            ok: true,
+            message: result.mensaje, 
+            asistencia: result.asistencia,
+            estado: result.estadoFinal,
+        });
+    } else {
+       return res.status(400).json({
+            ok: false,
+            error: result.mensaje,
+            asistencia: result.asistencia,
+            estado: result.estadoFinal 
+        });
+    }
   } catch (err) {
     console.error("Error registrar asistencia:", err);
     return res.status(500).json({ error: "Error interno al registrar asistencia" });

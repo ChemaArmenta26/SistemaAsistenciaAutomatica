@@ -5,6 +5,7 @@ import { connectDB } from "./config/db.js";
 import authRoutes from "./routes/auth.routes.js";
 import asistenciaRoutes from "./routes/asistencia.routes.js";
 import ubicacionRoutes from "./routes/ubicacion.routes.js";
+import associations from "./models/associations.js";
 
 dotenv.config();
 
@@ -41,6 +42,8 @@ const startServer = async () => {
   try {
     await connectDB();
     const PORT = process.env.PORT || 3000;
+
+    associations();
     
     app.listen(PORT, () => {
       console.log(`Servidor corriendo en puerto ${PORT}`);
