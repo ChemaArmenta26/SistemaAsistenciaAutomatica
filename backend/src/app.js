@@ -27,9 +27,10 @@ app.get("/", (req, res) => {
   res.json({ 
     message: "API del Sistema de Asistencia funcionando",
     endpoints: {
-      auth: "/api/auth",
+      login: "/api/login",
       asistencia: "/api/asistencia", 
-      ubicacion: "/api/ubicacion"
+      ubicacion: "/api/ubicacion",
+      clases: "/api/clases/hoy/id"
     }
   });
 });

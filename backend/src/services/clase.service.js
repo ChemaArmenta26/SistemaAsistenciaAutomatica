@@ -1,5 +1,6 @@
-import { Clase, Alumno, Aula, Horario, Maestro, Usuario } from "../models/index.js";
+import { Clase, Alumno, Aula, Horario, Maestro, Usuario, Asistencia } from "../models/index.js";
 import { DateTime } from "luxon";
+import { Op } from "sequelize";
 
 const TIMEZONE = process.env.TZ || "America/Hermosillo";
 
@@ -9,10 +10,13 @@ class ClaseService {
     const now = DateTime.now().setZone(TIMEZONE);
     const diaHoy = now.weekday === 7 ? 0 : now.weekday; 
     
-    //harcodeado por el momento
+    const inicioDia = now.startOf('day').toJSDate();
+    const finDia = now.endOf('day').toJSDate();
+
     const PERIODO_ACTUAL = "ENE-MAY 2025"; 
 
     try {
+
       const alumno = await Alumno.findByPk(idAlumno, {
         include: [
           {
@@ -44,16 +48,34 @@ class ClaseService {
         return []; 
       }
 
+      const asistenciasHoy = await Asistencia.findAll({
+        where: {
+          idAlumno: idAlumno,
+          fechaHora: {
+            [Op.between]: [inicioDia, finDia]
+          }
+        },
+        attributes: ['idGrupo', 'estado'] 
+      });
+
+      const asistenciaMap = new Map();
+      asistenciasHoy.forEach(a => {
+        asistenciaMap.set(a.idGrupo, a.estado);
+      });
+
       const clasesFormateadas = alumno.Clases.map(c => {
         const horario = c.Horarios[0]; 
-        
+
+        const estadoActual = asistenciaMap.get(c.idGrupo) || null;
+
         return {
           id: c.idGrupo,
           name: c.nombreMateria,
           instructor: c.Maestro?.Usuario?.nombre || "Por asignar",
           room: c.Aula?.nombreAula || "Sin Aula",
           horaInicioRaw: horario.horaInicio, 
-          time: `${horario.horaInicio.slice(0, 5)} - ${horario.horaFin.slice(0, 5)}`
+          time: `${horario.horaInicio.slice(0, 5)} - ${horario.horaFin.slice(0, 5)}`,
+          attendanceStatus: estadoActual 
         };
       });
 
