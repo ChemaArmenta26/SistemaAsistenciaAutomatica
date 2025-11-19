@@ -6,21 +6,52 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { loginService } from "@/services/auth.service"
 
 interface LoginScreenProps {
-  onLogin: (role: "student" | "teacher", name: string) => void
+  onLogin: (role: "student" | "teacher", name: string, token: string) => void
 }
 
 export function LoginScreen({ onLogin }: LoginScreenProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+
   const [userType, setUserType] = useState<"student" | "teacher">("student")
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (email && password) {
-      const name = email.split("@")[0]
-      onLogin(userType, name)
+    setError(null)
+
+    if (!email || !password) {
+      setError("Por favor, completa todos los campos.")
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const data = await loginService(email, password)
+      const { token, user } = data
+
+      console.log(data)
+
+      const userRoleLower = user.rol.toLowerCase()
+      const uiRole = userType === "student" ? "alumno" : "maestro"
+
+      localStorage.setItem("token", token)
+      localStorage.setItem("user", JSON.stringify(user))
+
+      const finalRole = userRoleLower.includes("alumno") ? "student" : "teacher"
+      onLogin(finalRole, user.nombre, token)
+
+    } catch (err: any) {
+      console.error(err)
+      setError(err.message || "Error de conexión con el servidor")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -42,6 +73,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                 variant={userType === "student" ? "default" : "outline"}
                 onClick={() => setUserType("student")}
                 className="w-full"
+                disabled={loading}
               >
                 Alumno
               </Button>
@@ -50,6 +82,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                 variant={userType === "teacher" ? "default" : "outline"}
                 onClick={() => setUserType("teacher")}
                 className="w-full"
+                disabled={loading}
               >
                 Maestro
               </Button>
@@ -64,6 +97,8 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="mt-1"
+                  disabled={loading}
+                  required
                 />
               </div>
               <div>
@@ -74,17 +109,27 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="mt-1"
+                  disabled={loading}
+                  required
                 />
               </div>
             </div>
 
-            <Button type="submit" className="w-full mt-6" size="lg">
-              Iniciar Sesión
+            {/* Mensaje de Error */}
+            {error && (
+              <div className="text-sm text-red-500 text-center font-medium bg-red-50 p-2 rounded border border-red-200">
+                {error}
+              </div>
+            )}
+
+            {/* Botón Submit con estado Loading */}
+            <Button type="submit" className="w-full mt-6" size="lg" disabled={loading}>
+              {loading ? "Validando..." : "Iniciar Sesión"}
             </Button>
           </form>
 
           <p className="text-xs text-muted-foreground text-center mt-4">
-            Prueba: estudiante@itson.edu.mx / cualquier contraseña
+            Asegúrate de usar tus credenciales institucionales.
           </p>
         </CardContent>
       </Card>

@@ -16,7 +16,7 @@ app.use(cors());
 app.use(express.json());
 
 // Rutas
-app.use("/api/auth", authRoutes);
+app.use("/api/login", authRoutes);
 app.use("/api/asistencia", asistenciaRoutes);
 app.use("/api/ubicacion", ubicacionRoutes);
 

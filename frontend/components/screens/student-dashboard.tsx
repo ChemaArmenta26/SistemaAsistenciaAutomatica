@@ -39,7 +39,7 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
             </CardHeader>
           </Card>
 
-          {/* Quick Stats */}
+          {/* Quick Stats 
           <div className="grid grid-cols-3 gap-2">
             <Card>
               <CardContent className="pt-4 text-center">
@@ -60,6 +60,7 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
               </CardContent>
             </Card>
           </div>
+          */}
 
           {/* Current Classes */}
           <div className="space-y-2">
@@ -97,12 +98,14 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
             ))}
           </div>
 
-          {/* Action Buttons */}
+          {/* Action Buttons 
           <div className="grid grid-cols-1 gap-2 pt-4">
             <Button variant="secondary" onClick={() => onNavigate("student-history")} className="w-full justify-center">
               Ver Historial Completo
             </Button>
           </div>
+          */}
+          
         </div>
       </main>
     </div>
