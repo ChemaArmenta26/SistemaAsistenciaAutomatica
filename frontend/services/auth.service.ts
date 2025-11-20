@@ -10,7 +10,7 @@ interface LoginResponse {
 
 export const loginService = async (email: string, password: string): Promise<LoginResponse> => {
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
+  console.log("API_URL:", API_URL);
   try {
     const response = await fetch(`${API_URL}/login`, {
       method: "POST",

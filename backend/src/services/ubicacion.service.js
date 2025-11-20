@@ -1,18 +1,3 @@
-import { jest } from '@jest/globals';
-jest.mock('../models/index.js', () => ({
-  Clase: {
-    findByPk: jest.fn(() =>
-      Promise.resolve({
-        Aula: {
-          latitud: 27.49133867676796,
-          longitud: -109.97510899127928,
-          radioPermitido: 50
-        }
-      })
-    )
-  },
-  Aula: {}
-}));
 import { Clase, Aula } from "../models/index.js";
 
 class UbicacionService {
@@ -31,26 +16,25 @@ class UbicacionService {
     const R = 6371000; // Radio de la Tierra en metros
     const dLat = this.toRad(lat2 - lat1);
     const dLon = this.toRad(lon2 - lon1);
-
-    const a =
+    
+    const a = 
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-
+      Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distancia = R * c; // Distancia en metros
-
+    
     return distancia;
   }
 
   /**
-   * Valida si el alumno está dentro del rango del aula asociada al grupo
+   * Valida si el alumno está dentro del rango del aula asignada al grupo
    */
-  static async validarUbicacionAula(idGrupo, latitud, longitud) {
+  static async validarUbicacionAula(idGrupo, latAlumno, lonAlumno) {
     try {
       // 1. Buscar el Grupo (Clase) y su Aula asociada
       const grupo = await Clase.findByPk(idGrupo, {
-        include: [{ model: Aula }]
+        include: [{ model: Aula }] 
       });
 
       if (!grupo) throw new Error("Grupo no encontrado");
@@ -59,7 +43,7 @@ class UbicacionService {
       const { latitud: latAula, longitud: lonAula, radioPermitido } = grupo.Aula;
 
       // 2. Calcular distancia
-      const distancia = this.calcularDistancia(latitud, longitud, latAula, lonAula);
+      const distancia = this.calcularDistancia(latAlumno, lonAlumno, latAula, lonAula);
 
       // 3. Validar contra el radio permitido
       const esValido = distancia <= radioPermitido;
@@ -68,17 +52,11 @@ class UbicacionService {
         ok: esValido,
         distancia: parseFloat(distancia.toFixed(2)),
         radioPermitido,
-        mensaje: esValido
-          ? "Ubicación válida"
-          : `Estás a ${distancia.toFixed(1)}m del aula (máximo ${radioPermitido}m).`
+        mensaje: esValido ? "Ubicación válida" : `Estás a ${distancia.toFixed(1)}m del aula (máximo ${radioPermitido}m).`
       };
 
     } catch (error) {
-      return {
-        ok: false,
-        distancia: null,
-        mensaje: error.message
-      };
+      return { ok: false, distancia: null, mensaje: error.message };
     }
   }
 }
