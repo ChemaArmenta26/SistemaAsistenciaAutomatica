@@ -1,0 +1,71 @@
+import { Clase, Alumno, Aula, Horario, Maestro, Usuario } from "../models/index.js";
+import { DateTime } from "luxon";
+
+const TIMEZONE = process.env.TZ || "America/Hermosillo";
+
+class ClaseService {
+  
+  static async getClasesHoyAlumno(idAlumno) {
+    const now = DateTime.now().setZone(TIMEZONE);
+    const diaHoy = now.weekday === 7 ? 0 : now.weekday; 
+    
+    //harcodeado por el momento
+    const PERIODO_ACTUAL = "ENE-MAY 2025"; 
+
+    try {
+      const alumno = await Alumno.findByPk(idAlumno, {
+        include: [
+          {
+            model: Clase,
+            required: true, 
+            where: { periodo: PERIODO_ACTUAL },
+            include: [
+              { 
+                model: Aula,
+                attributes: ['nombreAula', 'idAula']
+              },
+              {
+                model: Maestro,
+                include: [{ model: Usuario, attributes: ['nombre'] }] 
+              },
+              {
+                model: Horario,
+                required: true,
+                where: { diaSemana: diaHoy },
+                attributes: ['horaInicio', 'horaFin']
+              }
+            ],
+            through: { attributes: [] } 
+          }
+        ]
+      });
+
+      if (!alumno || !alumno.Clases) {
+        return []; 
+      }
+
+      const clasesFormateadas = alumno.Clases.map(c => {
+        const horario = c.Horarios[0]; 
+        
+        return {
+          id: c.idGrupo,
+          name: c.nombreMateria,
+          instructor: c.Maestro?.Usuario?.nombre || "Por asignar",
+          room: c.Aula?.nombreAula || "Sin Aula",
+          horaInicioRaw: horario.horaInicio, 
+          time: `${horario.horaInicio.slice(0, 5)} - ${horario.horaFin.slice(0, 5)}`
+        };
+      });
+
+      clasesFormateadas.sort((a, b) => a.horaInicioRaw.localeCompare(b.horaInicioRaw));
+
+      return clasesFormateadas;
+
+    } catch (error) {
+      console.error("Error en ClaseService:", error);
+      throw error;
+    }
+  }
+}
+
+export default ClaseService;

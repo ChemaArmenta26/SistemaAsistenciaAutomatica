@@ -6,6 +6,7 @@ import authRoutes from "./routes/auth.routes.js";
 import asistenciaRoutes from "./routes/asistencia.routes.js";
 import ubicacionRoutes from "./routes/ubicacion.routes.js";
 import associations from "./models/associations.js";
+import claseRoutes from "./routes/clase.routes.js";
 
 dotenv.config();
 
@@ -19,6 +20,7 @@ app.use(express.json());
 app.use("/api/login", authRoutes);
 app.use("/api/asistencia", asistenciaRoutes);
 app.use("/api/ubicacion", ubicacionRoutes);
+app.use("/api/clases", claseRoutes);
 
 // Ruta de prueba
 app.get("/", (req, res) => {

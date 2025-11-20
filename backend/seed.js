@@ -1,14 +1,17 @@
-// seed.js
 import sequelize from "./src/config/db.js";
 
-// MODELOS
-import Usuario from "./src/models/Usuario.js";
-import Maestro from "./src/models/Maestro.js";
-import Alumno from "./src/models/Alumno.js";
-import Aula from "./src/models/Aula.js";
-import Clase from "./src/models/Clase.js";
-import Horario from "./src/models/Horario.js";
+import { 
+  Usuario, 
+  Maestro, 
+  Alumno, 
+  Aula, 
+  Clase, 
+  Horario, 
+  Inscripcion 
+} from "./src/models/index.js";
+
 import setupAssociations from "./src/models/associations.js";
+
 setupAssociations();
 
 import bcrypt from "bcryptjs";
@@ -16,6 +19,8 @@ import bcrypt from "bcryptjs";
 async function runSeed() {
   try {
     console.log("Sincronizando base de datos...");
+   
+    // force: true borra todo y lo vuelve a crear
     await sequelize.sync({ force: true });
 
     // ============================================================
@@ -63,39 +68,83 @@ async function runSeed() {
 
     const aula = await Aula.create({
       nombreAula: "B-204",
-      latitud: 27.493200,
-      longitud: -109.933700,
-      radioPermitido: 20.0,
+      latitud: 27.484065687223406,
+      longitud: -109.98914823490362,
+      radioPermitido: 50,
     });
 
     console.log("Aula creada");
 
     // ============================================================
-    // CREAR CLASE / GRUPO
+    // CREAR CLASES / GRUPOS
     // ============================================================
 
-    const clase = await Clase.create({
+    const clase1 = await Clase.create({
       nombreMateria: "Programación II",
       periodo: "ENE-MAY 2025",
       idMaestro: maestro.idMaestro,
       idAula: aula.idAula,
     });
 
-    console.log("Clase/Grupo creado");
-
-    // ============================================================
-    // CREAR HORARIO (lunes 9:00 a 10:30)
-    // ============================================================
-
-    await Horario.create({
-      idGrupo: clase.idGrupo,
-      diaSemana: 1,          // 1 = Lunes
-      horaInicio: "09:00",
-      horaFin: "10:30",
-      margenDespuesMin: 15,
+    const clase2 = await Clase.create({
+      nombreMateria: "Programación III",
+      periodo: "ENE-MAY 2025",
+      idMaestro: maestro.idMaestro,
+      idAula: aula.idAula,
     });
 
-    console.log("Horario creado");
+    console.log("Clases/Grupos creados");
+
+    // ============================================================
+    // CREAR HORARIOS
+    // ============================================================
+
+    // Horario para Clase 1: Lunes (1) de 9:00 a 10:30
+    await Horario.create({
+      idGrupo: clase1.idGrupo,
+      diaSemana: 1,          
+      horaInicio: "09:00",
+      horaFin: "10:30",
+      margenDespuesMin: 10,
+    });
+
+    await Horario.create({
+      idGrupo: clase1.idGrupo,
+      diaSemana: 3,          
+      horaInicio: "16:00",
+      horaFin: "17:00",
+      margenDespuesMin: 10,
+    });
+
+    await Horario.create({
+      idGrupo: clase2.idGrupo,
+      diaSemana: 3,          // 3 = Miércoles
+      horaInicio: "17:00",
+      horaFin: "23:00",
+      margenDespuesMin: 10,
+    });
+
+    console.log("Horarios creados");
+
+    // ============================================================
+    // INSCRIPCIONES (EL PUENTE MÁGICO)
+    // ============================================================
+
+
+    await Inscripcion.create({
+        idAlumno: alumno.idAlumno,
+        idGrupo: clase1.idGrupo,
+        activo: true
+    });
+
+
+    await Inscripcion.create({
+        idAlumno: alumno.idAlumno,
+        idGrupo: clase2.idGrupo,
+        activo: true
+    });
+
+    console.log("Alumno inscrito correctamente en ambas clases");
 
     console.log("\nSEED COMPLETADO CORRECTAMENTE");
     process.exit();

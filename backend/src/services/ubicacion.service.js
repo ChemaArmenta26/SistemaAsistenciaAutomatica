@@ -1,5 +1,4 @@
-import Clase from "../models/Clase.js";
-import Aula from "../models/Aula.js";
+import { Clase, Aula } from "../models/index.js";
 
 class UbicacionService {
 
