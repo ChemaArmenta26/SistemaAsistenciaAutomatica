@@ -6,12 +6,10 @@ const TIMEZONE = process.env.TZ || "America/Hermosillo";
 class ScheduleService {
 
   static async isWithinSchedule(idGrupo, fechaHora = null) {
-
     let now;
 
     if (fechaHora) {
       now = DateTime.fromISO(fechaHora, { zone: TIMEZONE });
-
       if (!now.isValid) {
         return {
           ok: false,
@@ -19,7 +17,6 @@ class ScheduleService {
           detail: "Fecha inválida: formato ISO esperado (YYYY-MM-DDTHH:mm:ss)"
         };
       }
-
     } else {
       now = DateTime.now().setZone(TIMEZONE);
     }
@@ -46,19 +43,31 @@ class ScheduleService {
 
       const inicioMin = hIni * 60 + mIni;
       const finMin = hFin * 60 + mFin;
-      const margen = h.margenDespuesMin ?? 15;
-
+      const margen = h.margenDespuesMin ?? 15; // Margen para cerrar asistencia
+      
+      // Ventana total permitida
       const ventanaFin = finMin + margen;
 
       if (nowMinutes >= inicioMin && nowMinutes <= ventanaFin) {
+        
+        // Lógica para determinar si es Retardo
+        const TOLERANCIA_RETARDO = 15; 
+        let estadoCalculado = "Registrada";
+
+        if (nowMinutes > (inicioMin + TOLERANCIA_RETARDO)) {
+            estadoCalculado = "Retardo";
+        }
+
         return {
           ok: true,
           horario: h,
+          estadoSugerido: estadoCalculado,
           detail: "Dentro del horario permitido"
         };
       }
     }
 
+    // Si termina el ciclo y no entró en ningún if, está fuera de rango
     return {
       ok: false,
       horario: null,
