@@ -8,25 +8,26 @@ export async function ubi(req, res) {
       return res.status(400).json({ error: "Faltan campos requeridos" });
     }
 
-    const result = await UbicacionService.validarUbicacionAula(idGrupo, latitud, longitud);
+    const result = await UbicacionService.validarUbicacionAula(
+      idGrupo,
+      latitud,
+      longitud
+    );
 
     if (result.ok) {
       return res.status(200).json({
         ok: true,
         mensaje: result.mensaje,
-        detalles: {
-            distancia: result.distancia,
-            radioPermitido: result.radioPermitido
-        }
-      });
-    } else {
-      return res.status(400).json({
-        ok: false,
-        error: "Ubicación inválida",
-        mensaje: result.mensaje,
-        distancia: result.distancia
+        distancia: result.distancia,
+        radioPermitido: result.radioPermitido
       });
     }
+
+    return res.status(400).json({
+      ok: false,
+      mensaje: result.mensaje,
+      distancia: result.distancia
+    });
 
   } catch (err) {
     console.error("Error al validar ubicación:", err);
