@@ -68,8 +68,8 @@ async function runSeed() {
 
     const aula = await Aula.create({
       nombreAula: "B-204",
-      latitud: 27.484065687223406,
-      longitud: -109.98914823490362,
+      latitud: 27.49133867676796,
+      longitud: -109.97510899127928,
       radioPermitido: 50,
     });
 
