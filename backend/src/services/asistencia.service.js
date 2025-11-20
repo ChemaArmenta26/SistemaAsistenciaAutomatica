@@ -2,6 +2,7 @@ import Asistencia from "../models/Asistencia.js";
 import ScheduleService from "./schedule.service.js";
 import UbicacionService from "./ubicacion.service.js";
 import { DateTime } from "luxon";
+import { Op } from "sequelize";
 
 const TIMEZONE = process.env.TZ || "America/Hermosillo";
 
@@ -9,7 +10,7 @@ class AsistenciaService {
   
   static async registrarAsistencia({ idAlumno, idGrupo, latitud, longitud, precision = null, fechaHora = null }) {
     
-    // Parsear fecha
+    // Parsear fecha y zona horaria
     const parsedDate = fechaHora
       ? DateTime.fromISO(fechaHora, { zone: TIMEZONE })
       : DateTime.now().setZone(TIMEZONE);
@@ -20,6 +21,29 @@ class AsistenciaService {
         mensaje: "Fecha inválida",
         estadoFinal: "Error",
         asistencia: null
+      };
+    }
+
+    // Obtener el inicio (00:00:00) y fin (23:59:59) del día actual en la zona horaria correcta
+    const inicioDia = parsedDate.startOf('day').toJSDate();
+    const finDia = parsedDate.endOf('day').toJSDate();
+
+    const asistenciaExistente = await Asistencia.findOne({
+      where: {
+        idAlumno: idAlumno,
+        idGrupo: idGrupo,
+        fechaHora: {
+          [Op.between]: [inicioDia, finDia] // Busca entre inicio y fin del día
+        }
+      }
+    });
+
+    if (asistenciaExistente) {
+      return {
+        exito: false,
+        mensaje: "Ya registraste asistencia para esta clase el día de hoy.",
+        estadoFinal: "Duplicada",
+        asistencia: asistenciaExistente
       };
     }
 
@@ -35,7 +59,7 @@ class AsistenciaService {
       };
     }
 
-    // Validar Horario
+    // Validar horario 
     const evalHorario = await ScheduleService.isWithinSchedule(idGrupo, parsedDate);
     
     if (!evalHorario.ok) {
@@ -47,7 +71,8 @@ class AsistenciaService {
       };
     }
 
-    const estado = evalHorario.ok ? "Registrada" : "Fuera de horario";
+    // Determinar estado (Registrada o Retardo)
+    const estado = evalHorario.estadoSugerido || "Registrada";
 
     const asistencia = await Asistencia.create({
       fechaHora: parsedDate.toJSDate(),
@@ -58,11 +83,10 @@ class AsistenciaService {
       idAlumno,
       idGrupo,
     });
-
     
     return {
       exito: true, 
-      mensaje: "Asistencia registrada correctamente",              
+      mensaje: `Asistencia registrada correctamente (${estado})`,              
       asistencia,               
       estadoFinal: estado       
     };

@@ -1,5 +1,5 @@
 import sequelize from "./src/config/db.js";
-
+import bcrypt from "bcryptjs";
 import { 
   Usuario, 
   Maestro, 
@@ -9,62 +9,98 @@ import {
   Horario, 
   Inscripcion 
 } from "./src/models/index.js";
-
 import setupAssociations from "./src/models/associations.js";
 
 setupAssociations();
 
-import bcrypt from "bcryptjs";
+const NOMBRES = ["Juan", "Maria", "Pedro", "Ana", "Luis", "Sofia", "Carlos", "Lucia", "Jorge", "Elena", "Miguel", "Fernanda", "David", "Valentina", "Jose", "Camila", "Daniel", "Isabella", "Andres", "Mariana"];
+const APELLIDOS = ["Garcia", "Rodriguez", "Lopez", "Martinez", "Gonzalez", "Perez", "Sanchez", "Romero", "Diaz", "Torres", "Ruiz", "Vargas", "Castro", "Ramos", "Flores", "Acosta", "Silva", "Mendez", "Gutierrez", "Morales"];
+const MATERIAS = ["Ingeniería de Software", "Base de Datos", "Redes", "Sistemas Operativos", "Prog. Web", "IA", "Cálculo", "Álgebra", "Física", "Ética", "Estructura de Datos", "UX/UI", "Seguridad", "Gestión", "IoT", "Big Data", "Cloud", "Móviles", "DevOps", "Calidad"];
+
+const getFixedElement = (arr, index) => arr[index % arr.length];
 
 async function runSeed() {
   try {
-    console.log("Sincronizando base de datos...");
-   
-    // force: true borra todo y lo vuelve a crear
+    console.log(" Sincronizando base de datos...");
     await sequelize.sync({ force: true });
 
-    // ============================================================
-    // CREAR USUARIOS
-    // ============================================================
+    const passwordHash = await bcrypt.hash("123456", 10);
 
-    const passwordAlumno = await bcrypt.hash("123456", 10);
-    const passwordMaestro = await bcrypt.hash("123456", 10);
+    console.log("Creando 5 Aulas...");
+    const aulas = await Aula.bulkCreate([
+        { nombreAula: "B-201", latitud: 27.4840, longitud: -109.9891, radioPermitido: 50 },
+        { nombreAula: "LV-100", latitud: 27.4499, longitud: -109.9135, radioPermitido: 50 },
+        { nombreAula: "C-304", latitud: 27.4838, longitud: -109.9895, radioPermitido: 50 },
+        { nombreAula: "A-101", latitud: 27.4850, longitud: -109.9880, radioPermitido: 50 },
+        { nombreAula: "Lab-D", latitud: 27.4842, longitud: -109.9900, radioPermitido: 50 },
+    ]);
 
-    const alumnoUser = await Usuario.create({
-      nombre: "José Pérez",
-      email: "alumno@itson.edu.mx",
-      password: passwordAlumno,
-      rol: "Alumno",
-    });
+    console.log("Creando 10 Maestros...");
+    const maestros = [];
+    for (let i = 0; i < 10; i++) {
+        const nombre = `${getFixedElement(NOMBRES, i)} ${getFixedElement(APELLIDOS, i)}`;
+        const email = `maestro${i+1}@itson.edu.mx`;
+        
+        const user = await Usuario.create({
+            nombre,
+            email,
+            password: passwordHash,
+            rol: "Maestro"
+        });
 
-    const maestroUser = await Usuario.create({
-      nombre: "Dr. Juan López",
-      email: "maestro@itson.edu.mx",
-      password: passwordMaestro,
-      rol: "Maestro",
-    });
+        const maestro = await Maestro.create({
+            idUsuario: user.idUsuario,
+            especialidad: "Docencia General"
+        });
+        maestros.push(maestro);
+    }
 
-    console.log("Usuarios creados");
+    console.log("Creando 50 Alumnos...");
+    const alumnos = [];
+    for (let i = 0; i < 50; i++) {
+        const nombre = `${getFixedElement(NOMBRES, i + 5)} ${getFixedElement(APELLIDOS, i + 10)} ${getFixedElement(APELLIDOS, i)}`;
+        const email = `alumno${i+1}@potros.itson.edu.mx`;
+        
+        const user = await Usuario.create({
+            nombre,
+            email,
+            password: passwordHash,
+            rol: "Alumno"
+        });
 
-    // ============================================================
-    // CREAR ALUMNO Y MAESTRO
-    // ============================================================
+        const alumno = await Alumno.create({
+            idUsuario: user.idUsuario,
+            matricula: `ID${(1000 + i).toString()}`
+        });
+        alumnos.push(alumno);
+    }
 
-    const alumno = await Alumno.create({
-      idUsuario: alumnoUser.idUsuario,
-      matricula: "2233004455",
-    });
+    console.log("Creando 20 Clases distribuidas...");
+    const clases = [];
+    
+    for (let i = 0; i < 20; i++) {
+        const maestro = maestros[i % maestros.length];
+        const aula = aulas[i % aulas.length];
+        const materia = MATERIAS[i % MATERIAS.length];
 
-    const maestro = await Maestro.create({
-      idUsuario: maestroUser.idUsuario,
-      especialidad: "Ingeniería en Software",
-    });
+        const clase = await Clase.create({
+            nombreMateria: materia,
+            periodo: "ENE-MAY 2025",
+            idMaestro: maestro.idMaestro,
+            idAula: aula.idAula
+        });
+        clases.push(clase);
 
-    console.log("Alumno y Maestro creados");
+        const dia1 = (i % 2 === 0) ? 1 : 2; 
+        const dia2 = dia1 + 2;
+        const horaBase = 7 + Math.floor(i / 2); 
+        
+        const hIni = `${horaBase.toString().padStart(2,'0')}:00`;
+        const hFin = `${(horaBase+1).toString().padStart(2,'0')}:50`;
 
-    // ============================================================
-    // CREAR AULA
-    // ============================================================
+        await Horario.create({ idGrupo: clase.idGrupo, diaSemana: dia1, horaInicio: hIni, horaFin: hFin });
+        await Horario.create({ idGrupo: clase.idGrupo, diaSemana: dia2, horaInicio: hIni, horaFin: hFin });
+    }
 
     const aula = await Aula.create({
       nombreAula: "B-204",
@@ -72,81 +108,23 @@ async function runSeed() {
       longitud: -109.97510899127928,
       radioPermitido: 50,
     });
+    console.log("Inscribiendo alumnos...");
+    for (let i = 0; i < alumnos.length; i++) {
+        const alumno = alumnos[i];
+        
+        for (let j = 0; j < 4; j++) {
+            const claseIndex = (i + (j * 5)) % clases.length;
+            const clase = clases[claseIndex];
+            await Inscripcion.create({
+                idAlumno: alumno.idAlumno,
+                idGrupo: clase.idGrupo,
+                activo: true
+            });
+        }
+    }
 
-    console.log("Aula creada");
+    console.log("\nSEED COMPLETADO");
 
-    // ============================================================
-    // CREAR CLASES / GRUPOS
-    // ============================================================
-
-    const clase1 = await Clase.create({
-      nombreMateria: "Programación II",
-      periodo: "ENE-MAY 2025",
-      idMaestro: maestro.idMaestro,
-      idAula: aula.idAula,
-    });
-
-    const clase2 = await Clase.create({
-      nombreMateria: "Programación III",
-      periodo: "ENE-MAY 2025",
-      idMaestro: maestro.idMaestro,
-      idAula: aula.idAula,
-    });
-
-    console.log("Clases/Grupos creados");
-
-    // ============================================================
-    // CREAR HORARIOS
-    // ============================================================
-
-    // Horario para Clase 1: Lunes (1) de 9:00 a 10:30
-    await Horario.create({
-      idGrupo: clase1.idGrupo,
-      diaSemana: 1,          
-      horaInicio: "09:00",
-      horaFin: "10:30",
-      margenDespuesMin: 10,
-    });
-
-    await Horario.create({
-      idGrupo: clase1.idGrupo,
-      diaSemana: 3,          
-      horaInicio: "16:00",
-      horaFin: "17:00",
-      margenDespuesMin: 10,
-    });
-
-    await Horario.create({
-      idGrupo: clase2.idGrupo,
-      diaSemana: 3,          // 3 = Miércoles
-      horaInicio: "17:00",
-      horaFin: "23:00",
-      margenDespuesMin: 10,
-    });
-
-    console.log("Horarios creados");
-
-    // ============================================================
-    // INSCRIPCIONES (EL PUENTE MÁGICO)
-    // ============================================================
-
-
-    await Inscripcion.create({
-        idAlumno: alumno.idAlumno,
-        idGrupo: clase1.idGrupo,
-        activo: true
-    });
-
-
-    await Inscripcion.create({
-        idAlumno: alumno.idAlumno,
-        idGrupo: clase2.idGrupo,
-        activo: true
-    });
-
-    console.log("Alumno inscrito correctamente en ambas clases");
-
-    console.log("\nSEED COMPLETADO CORRECTAMENTE");
     process.exit();
 
   } catch (err) {
