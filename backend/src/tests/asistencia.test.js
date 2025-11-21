@@ -1,14 +1,20 @@
-import { jest } from "@jest/globals";
+/**
+ * PRUEBAS DE REGISTRO DE ASISTENCIA (CP-REG)
+ * Aquí se valida el proceso de registro de asistencia.
+ */
 
-// Variable para controlar si ya se registró asistencia 
+import { jest } from '@jest/globals';
+
+// Variable que simula si el alumno ya registró asistencia hoy
 let yaRegistrado = false;
 
+// MOCK del servicio real
 jest.unstable_mockModule("../services/asistencia.service.js", () => ({
   default: {
     registrarAsistencia: jest.fn((data) => {
       const { latitud, longitud, fechaHora } = data;
 
-      // Fallo por horarioo
+      // Caso: fuera de horario
       if (fechaHora === "fuera_de_horario") {
         return Promise.resolve({
           exito: false,
@@ -18,9 +24,9 @@ jest.unstable_mockModule("../services/asistencia.service.js", () => ({
         });
       }
 
-      // Caso exitoso la ubicación es correcta chaval
+      //ubicación correcta
       if (latitud === 27.49133867676796 && longitud === -109.97510899127928) {
-        // Verificar duplicidad
+        // Caso: duplicidad
         if (yaRegistrado) {
           return Promise.resolve({
             exito: false,
@@ -29,20 +35,18 @@ jest.unstable_mockModule("../services/asistencia.service.js", () => ({
             asistencia: null,
           });
         }
-        
+
+        // Primer registro exitoso
         yaRegistrado = true;
         return Promise.resolve({
           exito: true,
           mensaje: "Asistencia registrada correctamente",
           estadoFinal: "Registrada",
-          asistencia: {
-            idAsistencia: 1,
-            estado: "Registrada",
-          },
+          asistencia: { idAsistencia: 1, estado: "Registrada" },
         });
       }
 
-      // Fallo por ubicación
+      //fuera de rango
       return Promise.resolve({
         exito: false,
         mensaje: "Fuera de rango",
@@ -53,21 +57,26 @@ jest.unstable_mockModule("../services/asistencia.service.js", () => ({
   },
 }));
 
+// Importaciones dinámicas
 const { register } = await import("../controllers/asistencia.controller.js");
 const express = (await import("express")).default;
 const cors = (await import("cors")).default;
 const request = (await import("supertest")).default;
 
+// App para pruebas
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.post("/api/asistencia", register);
 
 describe("Pruebas de Registro de Asistencia (CP-REG)", () => {
+
+  // Se reinicia el flag antes de cada prueba
   beforeEach(() => {
     yaRegistrado = false;
   });
 
+  // CP-REG-01: Registro exitoso
   test("CP-REG-01: Registro Exitoso", async () => {
     const response = await request(app).post("/api/asistencia").send({
       idAlumno: 1,
@@ -81,6 +90,7 @@ describe("Pruebas de Registro de Asistencia (CP-REG)", () => {
     expect(response.body.ok).toBe(true);
   });
 
+  // CP-REG-02: Fallo por horario
   test("CP-REG-02: Fallo por Horario", async () => {
     const response = await request(app).post("/api/asistencia").send({
       idAlumno: 1,
@@ -94,6 +104,7 @@ describe("Pruebas de Registro de Asistencia (CP-REG)", () => {
     expect(response.status).toBe(400);
   });
 
+  // CP-REG-03: Ubicación fuera de rango
   test("CP-REG-03: Fallo por Ubicación", async () => {
     const response = await request(app).post("/api/asistencia").send({
       idAlumno: 1,
@@ -106,18 +117,17 @@ describe("Pruebas de Registro de Asistencia (CP-REG)", () => {
     expect(response.status).toBe(400);
   });
 
+  /// CP-REG-04: Duplicidad de Registro
   test("CP-REG-04: Duplicidad de Registro", async () => {
-    // Primer registro (debe ser exitoso)
-    const primera = await request(app).post("/api/asistencia").send({
+    // Registro exitoso
+    await request(app).post("/api/asistencia").send({
       idAlumno: 1,
       idGrupo: 1,
       latitud: 27.49133867676796,
       longitud: -109.97510899127928,
     });
 
-    console.log("Primera asistencia:", primera.status);
-
-    // Segundo registro (debe fallar por que esta duplicado o debe estar)
+    // Segundo registro: debe fallar
     const segunda = await request(app).post("/api/asistencia").send({
       idAlumno: 1,
       idGrupo: 1,
@@ -128,6 +138,6 @@ describe("Pruebas de Registro de Asistencia (CP-REG)", () => {
     console.log("CP-REG-04 Response:", segunda.status, segunda.body);
     expect(segunda.status).toBe(400);
     const mensaje = segunda.body.error || segunda.body.mensaje || "";
-    expect(mensaje.toLowerCase()).toMatch(/duplicado|ya registro/);
+    expect(mensaje.toLowerCase()).toContain("ya has registrado");
   });
 });

@@ -26,13 +26,14 @@ async function runSeed() {
 
     const passwordHash = await bcrypt.hash("123456", 10);
 
-    console.log("Creando 5 Aulas...");
+    console.log("Creando 6 Aulas...");
     const aulas = await Aula.bulkCreate([
         { nombreAula: "B-201", latitud: 27.4840, longitud: -109.9891, radioPermitido: 50 },
         { nombreAula: "LV-100", latitud: 27.4499, longitud: -109.9135, radioPermitido: 50 },
         { nombreAula: "C-304", latitud: 27.4838, longitud: -109.9895, radioPermitido: 50 },
         { nombreAula: "A-101", latitud: 27.4850, longitud: -109.9880, radioPermitido: 50 },
         { nombreAula: "Lab-D", latitud: 27.4842, longitud: -109.9900, radioPermitido: 50 },
+        { nombreAula: "B-204", latitud: 27.49133867676796, longitud: -109.97510899127928, radioPermitido: 50 },
     ]);
 
     console.log("Creando 10 Maestros...");
@@ -101,13 +102,6 @@ async function runSeed() {
         await Horario.create({ idGrupo: clase.idGrupo, diaSemana: dia1, horaInicio: hIni, horaFin: hFin });
         await Horario.create({ idGrupo: clase.idGrupo, diaSemana: dia2, horaInicio: hIni, horaFin: hFin });
     }
-
-    const aula = await Aula.create({
-      nombreAula: "B-204",
-      latitud: 27.49133867676796,
-      longitud: -109.97510899127928,
-      radioPermitido: 50,
-    });
     console.log("Inscribiendo alumnos...");
     for (let i = 0; i < alumnos.length; i++) {
         const alumno = alumnos[i];

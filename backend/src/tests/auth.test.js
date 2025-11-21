@@ -1,17 +1,8 @@
 /**
- * ================================================
  * PRUEBAS DE AUTENTICACIÓN (CP-AUTH)
- * ================================================
- * Estas pruebas verifican el correcto funcionamiento
+ * Estas pruebas verifican el correcto funcionamiento :)
  * del login de alumnos y maestros dentro del sistema.
- *
- * notitas
- * - Usamos correos reales generados por el seed.
- * - alumno1@potros.itson.edu.mx  (Alumno)
- * - maestro1@itson.edu.mx        (Maestro) no olvidarrrrrr
- * - Contraseña siempre es "123456"
  */
-
 import request from "supertest";
 import express from "express";
 import cors from "cors";

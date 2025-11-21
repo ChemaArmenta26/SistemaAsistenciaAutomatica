@@ -1,9 +1,10 @@
 export default {
-    testEnvironment: 'node',
+    testEnvironment: "node",
     transform: {},
-    coveragePathIgnorePatterns: ['/node_modules/'],
-    testMatch: ['**/tests/**/*.test.js'],
     moduleNameMapper: {
-      '^(\\.{1,2}/.*)\\.js$': '$1',
+      "^(\\.{1,2}/.*)\\.js$": "$1",
     },
+    testMatch: ["**/src/tests/**/*.test.js"],
+    moduleFileExtensions: ["js"],
+    verbose: true,
   };
