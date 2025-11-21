@@ -72,7 +72,7 @@ class AsistenciaService {
     }
 
     // Determinar estado (Registrada o Retardo)
-    const estado = evalHorario.estadoSugerido || "Registrada";
+    const estado = evalHorario.estadoSugerido;
 
     const asistencia = await Asistencia.create({
       fechaHora: parsedDate.toJSDate(),

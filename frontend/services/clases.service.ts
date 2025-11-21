@@ -7,6 +7,8 @@ export interface ClassItem {
   room: string;
   time: string;
   horaInicioRaw?: string;
+  attended: boolean;
+  attendanceStatus: 'Registrada' | 'Retardo' | null; 
 }
 
 export const getClassesTodayService = async (studentId: number): Promise<ClassItem[]> => {
