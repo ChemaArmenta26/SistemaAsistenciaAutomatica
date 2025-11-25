@@ -6,7 +6,7 @@ const TIMEZONE = process.env.TZ || "America/Hermosillo";
 
 class ClaseService {
   
-  static async getClasesHoyAlumno(idAlumno) {
+  static async getClasesHoyAlumno(idUsuario) {
     const now = DateTime.now().setZone(TIMEZONE);
     const diaHoy = now.weekday === 7 ? 0 : now.weekday; 
     
@@ -17,21 +17,16 @@ class ClaseService {
 
     try {
 
-      const alumno = await Alumno.findByPk(idAlumno, {
+      const alumno = await Alumno.findOne({
+        where: { idUsuario: idUsuario }, 
         include: [
           {
             model: Clase,
             required: true, 
             where: { periodo: PERIODO_ACTUAL },
             include: [
-              { 
-                model: Aula,
-                attributes: ['nombreAula', 'idAula']
-              },
-              {
-                model: Maestro,
-                include: [{ model: Usuario, attributes: ['nombre'] }] 
-              },
+              { model: Aula, attributes: ['nombreAula', 'idAula'] },
+              { model: Maestro, include: [{ model: Usuario, attributes: ['nombre'] }] },
               {
                 model: Horario,
                 required: true,
@@ -48,14 +43,16 @@ class ClaseService {
         return []; 
       }
 
+      const idAlumnoReal = alumno.idAlumno;
+
       const asistenciasHoy = await Asistencia.findAll({
         where: {
-          idAlumno: idAlumno,
+          idAlumno: idAlumnoReal,
           fechaHora: {
             [Op.between]: [inicioDia, finDia]
           }
         },
-        attributes: ['idGrupo', 'estado'] 
+        attributes: ['idGrupo', 'estado']
       });
 
       const asistenciaMap = new Map();
@@ -65,7 +62,6 @@ class ClaseService {
 
       const clasesFormateadas = alumno.Clases.map(c => {
         const horario = c.Horarios[0]; 
-
         const estadoActual = asistenciaMap.get(c.idGrupo) || null;
 
         return {
