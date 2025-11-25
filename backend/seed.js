@@ -21,21 +21,22 @@ const getFixedElement = (arr, index) => arr[index % arr.length];
 
 async function runSeed() {
   try {
-    console.log(" Sincronizando base de datos...");
+    console.log("🔄 Sincronizando base de datos (FORCE: TRUE)...");
     await sequelize.sync({ force: true });
 
     const passwordHash = await bcrypt.hash("123456", 10);
 
-    console.log("Creando 6 Aulas...");
+    // 1. AULAS
+    console.log("Creando 5 Aulas...");
     const aulas = await Aula.bulkCreate([
         { nombreAula: "B-201", latitud: 27.4840, longitud: -109.9891, radioPermitido: 50 },
         { nombreAula: "LV-100", latitud: 27.4499, longitud: -109.9135, radioPermitido: 50 },
         { nombreAula: "C-304", latitud: 27.4838, longitud: -109.9895, radioPermitido: 50 },
         { nombreAula: "A-101", latitud: 27.4850, longitud: -109.9880, radioPermitido: 50 },
         { nombreAula: "Lab-D", latitud: 27.4842, longitud: -109.9900, radioPermitido: 50 },
-        { nombreAula: "B-204", latitud: 27.49133867676796, longitud: -109.97510899127928, radioPermitido: 50 },
     ]);
 
+    // 2. MAESTROS
     console.log("Creando 10 Maestros...");
     const maestros = [];
     for (let i = 0; i < 10; i++) {
@@ -51,11 +52,13 @@ async function runSeed() {
 
         const maestro = await Maestro.create({
             idUsuario: user.idUsuario,
+            matriculaEmpleado: `EMP${2000 + i}`,
             especialidad: "Docencia General"
         });
         maestros.push(maestro);
     }
 
+    // 3. ALUMNOS
     console.log("Creando 50 Alumnos...");
     const alumnos = [];
     for (let i = 0; i < 50; i++) {
@@ -71,12 +74,13 @@ async function runSeed() {
 
         const alumno = await Alumno.create({
             idUsuario: user.idUsuario,
-            matricula: `ID${(1000 + i).toString()}`
+            matricula: `00000${1000 + i}` 
         });
         alumnos.push(alumno);
     }
 
-    console.log("Creando 20 Clases distribuidas...");
+    // 4. CLASES Y HORARIOS
+    console.log("Creando 20 Clases base...");
     const clases = [];
     
     for (let i = 0; i < 20; i++) {
@@ -102,13 +106,16 @@ async function runSeed() {
         await Horario.create({ idGrupo: clase.idGrupo, diaSemana: dia1, horaInicio: hIni, horaFin: hFin });
         await Horario.create({ idGrupo: clase.idGrupo, diaSemana: dia2, horaInicio: hIni, horaFin: hFin });
     }
+
+    // 5. INSCRIPCIONES MASIVAS
     console.log("Inscribiendo alumnos...");
     for (let i = 0; i < alumnos.length; i++) {
         const alumno = alumnos[i];
-        
+
         for (let j = 0; j < 4; j++) {
             const claseIndex = (i + (j * 5)) % clases.length;
             const clase = clases[claseIndex];
+
             await Inscripcion.create({
                 idAlumno: alumno.idAlumno,
                 idGrupo: clase.idGrupo,
@@ -117,12 +124,11 @@ async function runSeed() {
         }
     }
 
-    console.log("\nSEED COMPLETADO");
-
+    console.log("\nSEED COMPLETADO EXITOSAMENTE");
     process.exit();
 
   } catch (err) {
-    console.error("Error ejecutando seed:", err);
+    console.error("Error fatal en seed:", err);
     process.exit(1);
   }
 }

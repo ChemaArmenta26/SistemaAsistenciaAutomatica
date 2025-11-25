@@ -3,6 +3,7 @@ import { DateTime } from "luxon";
 import { Op } from "sequelize";
 
 const TIMEZONE = process.env.TZ || "America/Hermosillo";
+const PERIODO_ACTUAL = "ENE-MAY 2025";
 
 class ClaseService {
   
@@ -12,8 +13,6 @@ class ClaseService {
     
     const inicioDia = now.startOf('day').toJSDate();
     const finDia = now.endOf('day').toJSDate();
-
-    const PERIODO_ACTUAL = "ENE-MAY 2025"; 
 
     try {
 
@@ -84,6 +83,53 @@ class ClaseService {
       throw error;
     }
   }
+
+  static async getClasesHoyMaestro(idUsuarioInput) {
+    const now = DateTime.now().setZone(TIMEZONE);
+    const diaHoy = now.weekday === 7 ? 0 : now.weekday;  
+
+    try {
+
+      const maestro = await Maestro.findOne({
+        where: { idUsuario: idUsuarioInput }
+      });
+
+      if (!maestro) return [];
+
+      const clases = await Clase.findAll({
+        where: { 
+            idMaestro: maestro.idMaestro,
+            periodo: PERIODO_ACTUAL
+        },
+        include: [
+          { model: Aula, attributes: ['nombreAula', 'idAula'] },
+          {
+            model: Horario,
+            required: true,
+            where: { diaSemana: diaHoy },
+            attributes: ['horaInicio', 'horaFin']
+          }
+        ]
+      });
+
+      return clases.map(c => {
+        const horario = c.Horarios[0];
+        return {
+          id: c.idGrupo,
+          name: c.nombreMateria,
+          room: c.Aula?.nombreAula || "Sin Aula",
+          time: `${horario.horaInicio.slice(0, 5)} - ${horario.horaFin.slice(0, 5)}`,
+          horaInicioRaw: horario.horaInicio
+        };
+      }).sort((a, b) => a.horaInicioRaw.localeCompare(b.horaInicioRaw));
+
+    } catch (error) {
+      console.error("Error en getClasesHoyMaestro:", error);
+      throw error;
+    }
+  }
+
+
 }
 
 export default ClaseService;

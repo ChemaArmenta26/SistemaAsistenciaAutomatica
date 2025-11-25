@@ -1,4 +1,4 @@
-import Asistencia from "../models/Asistencia.js";
+import { Asistencia, Inscripcion, Alumno, Usuario }  from "../models/index.js";
 import ScheduleService from "./schedule.service.js";
 import UbicacionService from "./ubicacion.service.js";
 import { DateTime } from "luxon";
@@ -7,9 +7,9 @@ import { Op } from "sequelize";
 const TIMEZONE = process.env.TZ || "America/Hermosillo";
 
 class AsistenciaService {
-  
-  static async registrarAsistencia({ idAlumno, idGrupo, latitud, longitud, precision = null, fechaHora = null }) {
-    
+
+  static async registrarAsistencia({ idAlumno, idGrupo, latitud, longitud, precision = null, fechaHora}) {
+
     // Parsear fecha y zona horaria
     const parsedDate = fechaHora
       ? DateTime.fromISO(fechaHora, { zone: TIMEZONE })
@@ -17,7 +17,7 @@ class AsistenciaService {
 
     if (!parsedDate.isValid) {
       return {
-        exito: false, 
+        exito: false,
         mensaje: "Fecha inválida",
         estadoFinal: "Error",
         asistencia: null
@@ -61,7 +61,7 @@ class AsistenciaService {
 
     // Validar horario 
     const evalHorario = await ScheduleService.isWithinSchedule(idGrupo, parsedDate);
-    
+
     if (!evalHorario.ok) {
       return {
         exito: false,
@@ -83,14 +83,107 @@ class AsistenciaService {
       idAlumno,
       idGrupo,
     });
-    
+
     return {
-      exito: true, 
-      mensaje: `Asistencia registrada correctamente (${estado})`,              
-      asistencia,               
-      estadoFinal: estado       
+      exito: true,
+      mensaje: `Asistencia registrada correctamente (${estado})`,
+      asistencia,
+      estadoFinal: estado
     };
   }
+
+  static async obtenerListaAsistencia(idGrupo, fechaStr) {
+    const fecha = DateTime.fromISO(fechaStr, { zone: TIMEZONE });
+
+    const inicioDia = fecha.startOf('day').toJSDate();
+    const finDia = fecha.endOf('day').toJSDate();
+
+    try {
+      const inscripciones = await Inscripcion.findAll({
+        where: { idGrupo, activo: true },
+        include: [{
+          model: Alumno,
+          include: [{ model: Usuario, attributes: ['nombre', 'email'] }]
+        }]
+      });
+
+      const asistenciasRegistradas = await Asistencia.findAll({
+        where: {
+          idGrupo,
+          fechaHora: { [Op.between]: [inicioDia, finDia] }
+        }
+      });
+
+      const asistenciaMap = new Map();
+      asistenciasRegistradas.forEach(a => asistenciaMap.set(a.idAlumno, a));
+
+      const listaFinal = inscripciones.map(ins => {
+        const alumno = ins.Alumno;
+        const usuario = alumno.Usuario;
+
+        const asistencia = asistenciaMap.get(alumno.idAlumno);
+
+        return {
+          idAlumno: alumno.idAlumno,
+          matricula: alumno.matricula,
+          email: usuario.email,
+          nombre: usuario.nombre,
+
+          estado: asistencia ? asistencia.estado : "Pendiente",
+
+          hora: asistencia ? DateTime.fromJSDate(asistencia.fechaHora).setZone(TIMEZONE).toFormat("HH:mm") : "-",
+
+          metodo: asistencia ? (asistencia.latitud ? "GPS" : "Manual") : "-"
+        };
+      });
+
+      return listaFinal.sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+    } catch (error) {
+      console.error("Error en obtenerListaAsistencia:", error);
+      throw error;
+    }
+  }
+
+  static async registrarManual({ idAlumno, idGrupo, fechaStr, nuevoEstado }) {
+    const fecha = DateTime.fromISO(fechaStr, { zone: TIMEZONE });
+    const inicioDia = fecha.startOf('day').toJSDate();
+    const finDia = fecha.endOf('day').toJSDate();
+
+    try {
+      let asistencia = await Asistencia.findOne({
+        where: {
+          idAlumno,
+          idGrupo,
+          fechaHora: { [Op.between]: [inicioDia, finDia] }
+        }
+      });
+
+      if (asistencia) {
+        asistencia.estado = nuevoEstado;
+        asistencia.latitud = null; 
+        asistencia.longitud = null;
+        asistencia.precision = null;
+        await asistencia.save();
+      } else {
+        asistencia = await Asistencia.create({
+          idAlumno,
+          idGrupo,
+          fechaHora: fecha.toJSDate(),
+          estado: nuevoEstado,
+          latitud: null, 
+          longitud: null,
+          precision: null
+        });
+      }
+
+      return { ok: true, asistencia };
+    } catch (error) {
+      console.error("Error en registrarManual:", error);
+      throw error;
+    }
+  }
+
 }
 
 export default AsistenciaService;
