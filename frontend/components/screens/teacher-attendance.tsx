@@ -1,138 +1,259 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Header } from "@/components/layout/header"
-import { ChevronLeft, Download } from "lucide-react"
+import { ChevronLeft, Download, RefreshCw, MapPin, User } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { toast } from "sonner"
+import { 
+    getTeacherClassesTodayService, 
+    getGroupAttendanceListService, 
+    updateManualAttendanceService,
+    type StudentAttendanceItem,
+    type TeacherClassItem
+} from "@/services/maestro.service"
 
 interface TeacherAttendanceProps {
   userName: string
   onNavigate: (screen: string) => void
   onLogout: () => void
+  initialCourseId?: number 
 }
 
-export function TeacherAttendance({ userName, onNavigate, onLogout }: TeacherAttendanceProps) {
-  const [selectedDate, setSelectedDate] = useState("2024-11-08")
-  const [selectedCourse, setSelectedCourse] = useState("Desarrollo Web Avanzado")
+export function TeacherAttendance({ userName, onNavigate, onLogout, initialCourseId }: TeacherAttendanceProps) {
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [selectedCourseId, setSelectedCourseId] = useState<string>(initialCourseId ? initialCourseId.toString() : "")
+  
+  const [courses, setCourses] = useState<TeacherClassItem[]>([])
+  const [students, setStudents] = useState<StudentAttendanceItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [updatingId, setUpdatingId] = useState<number | null>(null)
 
-  const attendanceData = [
-    { id: 1, name: "Juan Pérez García", enrollment: "20210234", status: "presente", time: "10:05" },
-    { id: 2, name: "María López Rodríguez", enrollment: "20210235", status: "presente", time: "10:02" },
-    { id: 3, name: "Carlos Sánchez Martínez", enrollment: "20210236", status: "ausente", time: "-" },
-    { id: 4, name: "Ana Gómez Flores", enrollment: "20210237", status: "presente", time: "10:12" },
-    { id: 5, name: "Roberto Díaz Ruiz", enrollment: "20210238", status: "presente", time: "10:08" },
-    { id: 6, name: "Laura Fernández Cruz", enrollment: "20210239", status: "presente", time: "10:00" },
-    { id: 7, name: "David Morales Ramos", enrollment: "20210240", status: "ausente", time: "-" },
-    { id: 8, name: "Sofia García López", enrollment: "20210241", status: "presente", time: "10:04" },
-  ]
+  useEffect(() => {
+    const loadCourses = async () => {
+        try {
+            const userStr = localStorage.getItem("user");
+            if (!userStr) return;
+            const user = JSON.parse(userStr);
+            const teacherId = user.id;
 
-  const presentCount = attendanceData.filter((s) => s.status === "presente").length
-  const absentCount = attendanceData.length - presentCount
-  const percentage = Math.round((presentCount / attendanceData.length) * 100)
+            const data = await getTeacherClassesTodayService(teacherId)
+            setCourses(data)
+            
+            if (!initialCourseId && data.length > 0 && !selectedCourseId) {
+                setSelectedCourseId(data[0].id.toString())
+            }
+        } catch (e) { 
+            toast.error("Error cargando cursos") 
+        }
+    }
+    loadCourses()
+  }, [])
+
+  const fetchAttendance = async () => {
+    if (!selectedCourseId) return;
+    
+    setLoading(true)
+    try {
+        const data = await getGroupAttendanceListService(Number(selectedCourseId), selectedDate)
+        setStudents(data)
+    } catch (error: any) {
+        toast.error("Error cargando lista de asistencia")
+        setStudents([])
+    } finally {
+        setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (selectedCourseId) {
+        fetchAttendance()
+    }
+  }, [selectedCourseId, selectedDate])
+
+  // Manejar cambio manual de estado
+  const handleStatusChange = async (student: StudentAttendanceItem) => {
+    const statesMap: Record<string, string> = {
+        'Pendiente': 'Presente',
+        'Presente': 'Retardo',
+        'Retardo': 'Falta',
+        'Falta': 'Justificado',
+        'Justificado': 'Presente'
+    }
+    
+    const currentState = student.estado || 'Pendiente';
+    const nextState = statesMap[currentState] || 'Presente';
+    
+    setUpdatingId(student.idAlumno)
+    try {
+        await updateManualAttendanceService({
+            idAlumno: student.idAlumno,
+            idGrupo: Number(selectedCourseId),
+            fecha: selectedDate,
+            estado: nextState
+        })
+        
+        setStudents(prev => prev.map(s => 
+            s.idAlumno === student.idAlumno ? { ...s, estado: nextState as any, metodo: 'Manual' } : s
+        ))
+        toast.success(`Estado actualizado a ${nextState}`)
+    } catch (e) {
+        toast.error("No se pudo actualizar")
+    } finally {
+        setUpdatingId(null)
+    }
+  }
+
+  const presentCount = students.filter((s) => s.estado === "Presente" || s.estado === "Retardo").length
+  const absentCount = students.filter((s) => s.estado === "Falta").length
+  const percentage = students.length > 0 ? Math.round((presentCount / students.length) * 100) : 0
 
   return (
     <div className="min-h-screen bg-background">
       <Header userName={userName} onLogout={onLogout} role="teacher" />
 
       <main className="max-w-4xl mx-auto p-4 pb-20">
-        <Button variant="ghost" size="sm" onClick={() => onNavigate("teacher-dashboard")} className="mb-4">
+        <Button variant="ghost" size="sm" onClick={() => onNavigate("teacher-dashboard")} className="mb-4 text-muted-foreground hover:text-foreground">
           <ChevronLeft className="w-4 h-4 mr-1" />
-          Atrás a Cursos
+          Volver a Mis Cursos
         </Button>
 
-        <div className="space-y-4">
-          {/* Filters */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Registros de Asistencia</CardTitle>
+        <div className="space-y-6">
+          {/* Filtros Principales */}
+          <Card className="shadow-sm border-l-4 border-l-primary">
+            <CardHeader className="pb-3 border-b mb-3">
+              <CardTitle className="text-lg flex justify-between items-center">
+                <span>Gestión de Asistencia</span>
+                <Button variant="outline" size="sm" onClick={fetchAttendance} disabled={loading}>
+                    <RefreshCw className={`w-3 h-3 mr-2 ${loading ? 'animate-spin' : ''}`}/> Actualizar
+                </Button>
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium">Curso</label>
-                  <Select value={selectedCourse} onValueChange={setSelectedCourse}>
+                  <label className="text-sm font-semibold text-muted-foreground mb-1.5 block">Seleccionar Curso</label>
+                  <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Cargando cursos..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Desarrollo Web Avanzado">Desarrollo Web Avanzado</SelectItem>
-                      <SelectItem value="Base de Datos II">Base de Datos II</SelectItem>
-                      <SelectItem value="Seguridad Informática">Seguridad Informática</SelectItem>
+                      {courses.map(c => (
+                          <SelectItem key={c.id} value={c.id.toString()}>{c.name} ({c.time})</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Fecha</label>
+                  <label className="text-sm font-semibold text-muted-foreground mb-1.5 block">Fecha de Clase</label>
                   <input
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-input rounded-md bg-background"
+                    className="w-full h-10 px-3 py-2 border border-input rounded-md bg-background text-sm focus:ring-2 focus:ring-primary/20 outline-none"
                   />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Summary Stats */}
-          <div className="grid grid-cols-3 gap-2">
+          {/* Tarjetas de Estadísticas */}
+          <div className="grid grid-cols-3 gap-3">
             <Card>
-              <CardContent className="pt-4 text-center">
-                <div className="text-2xl font-bold text-primary">{presentCount}</div>
-                <div className="text-xs text-muted-foreground">Presentes</div>
+              <CardContent className="flex flex-col items-center justify-center p-4">
+                <span className="text-3xl font-bold text-green-600">{presentCount}</span>
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mt-1">Asistencias</span>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="pt-4 text-center">
-                <div className="text-2xl font-bold text-destructive">{absentCount}</div>
-                <div className="text-xs text-muted-foreground">Ausentes</div>
+              <CardContent className="flex flex-col items-center justify-center p-4">
+                <span className="text-3xl font-bold text-red-500">{absentCount}</span>
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mt-1">Faltas</span>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="pt-4 text-center">
-                <div className="text-2xl font-bold text-accent">{percentage}%</div>
-                <div className="text-xs text-muted-foreground">Asistencia</div>
+              <CardContent className="flex flex-col items-center justify-center p-4">
+                <span className="text-3xl font-bold text-blue-600">{percentage}%</span>
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mt-1">Participación</span>
               </CardContent>
             </Card>
           </div>
 
-          {/* Attendance List */}
+          {/* Lista de Estudiantes */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle>Alumnos ({attendanceData.length})</CardTitle>
-              <Button size="sm" variant="outline">
-                <Download className="w-4 h-4 mr-2" />
-                Descargar
+            <CardHeader className="flex flex-row items-center justify-between py-4 bg-muted/20 border-b">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <User className="w-4 h-4"/> Listado de Alumnos ({students.length})
+              </CardTitle>
+              <Button size="sm" variant="outline" disabled title="Próximamente">
+                <Download className="w-4 h-4 mr-2" /> Exportar PDF
               </Button>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {attendanceData.map((student) => (
-                  <div
-                    key={student.id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{student.name}</p>
-                      <p className="text-xs text-muted-foreground">{student.enrollment}</p>
+            
+            <CardContent className="p-0">
+                {loading ? (
+                    <div className="py-12 flex flex-col items-center justify-center text-muted-foreground space-y-3">
+                        <div className="animate-spin text-2xl">⏳</div>
+                        <p>Cargando lista de asistencia...</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm">{student.time}</span>
-                      <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${
-                          student.status === "presente"
-                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
-                            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
-                        }`}
-                      >
-                        {student.status === "presente" ? "Presente" : "Ausente"}
-                      </span>
+                ) : students.length === 0 ? (
+                    <div className="py-12 flex flex-col items-center justify-center text-muted-foreground bg-muted/10">
+                        <p className="text-4xl mb-2">📭</p>
+                        <p>No se encontraron alumnos inscritos en este grupo.</p>
                     </div>
-                  </div>
-                ))}
-              </div>
+                ) : (
+                    <div className="divide-y">
+                        {students.map((student) => (
+                        <div key={student.idAlumno} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 hover:bg-slate-50 transition-colors gap-3">
+                            
+                            {/* Información del Alumno */}
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <p className="font-semibold text-sm text-foreground truncate">{student.nombre}</p>
+                                    {student.metodo === 'GPS' && (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                                            <MapPin className="w-3 h-3 mr-0.5"/> GPS
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
+                                    <span>{student.matricula}</span>
+                                    <span className="text-slate-300">|</span>
+                                    <span>{student.email}</span>
+                                </div>
+                            </div>
+                            
+                            {/* Controles de Asistencia */}
+                            <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
+                                <div className="text-xs text-right">
+                                    <span className="block text-muted-foreground">Hora Registro</span>
+                                    <span className="font-medium text-foreground">{student.hora !== "-" ? student.hora : "--:--"}</span>
+                                </div>
+                                
+                                <button 
+                                    onClick={() => handleStatusChange(student)}
+                                    disabled={updatingId === student.idAlumno}
+                                    className={`w-24 py-1.5 rounded-md text-xs font-bold border shadow-sm transition-all active:scale-95 flex justify-center items-center ${
+                                        student.estado === "Presente" ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200" :
+                                        student.estado === "Retardo" ? "bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200" :
+                                        student.estado === "Falta" ? "bg-red-100 text-red-700 border-red-300 hover:bg-red-200" :
+                                        student.estado === "Justificado" ? "bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200" :
+                                        "bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200"
+                                    }`}
+                                >
+                                    {updatingId === student.idAlumno ? (
+                                        <RefreshCw className="w-3 h-3 animate-spin"/>
+                                    ) : (
+                                        student.estado
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                        ))}
+                    </div>
+                )}
             </CardContent>
           </Card>
         </div>

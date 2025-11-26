@@ -1,4 +1,4 @@
-import { Asistencia, Inscripcion, Alumno, Usuario }  from "../models/index.js";
+import { Asistencia, Inscripcion, Alumno, Usuario, Clase, Maestro }  from "../models/index.js";
 import ScheduleService from "./schedule.service.js";
 import UbicacionService from "./ubicacion.service.js";
 import { DateTime } from "luxon";
@@ -180,6 +180,73 @@ class AsistenciaService {
       return { ok: true, asistencia };
     } catch (error) {
       console.error("Error en registrarManual:", error);
+      throw error;
+    }
+  }
+
+  static async getResumenAlumno(idUsuarioInput) {
+    try {
+
+      const alumno = await Alumno.findOne({ where: { idUsuario: idUsuarioInput } });
+      if (!alumno) return [];
+
+      const inscripciones = await Inscripcion.findAll({
+        where: { idAlumno: alumno.idAlumno, activo: true },
+        include: [{
+            model: Clase,
+            include: [{ 
+                model: Maestro, 
+                include: [{ model: Usuario, attributes: ['nombre'] }] 
+            }]
+        }]
+      });
+
+      const resumen = await Promise.all(inscripciones.map(async (ins) => {
+        const clase = ins.Clase;
+        
+        const asistencias = await Asistencia.findAll({
+            where: { idAlumno: alumno.idAlumno, idGrupo: clase.idGrupo }
+        });
+
+        const totalAsistencias = asistencias.filter(a => a.estado === 'Presente' || a.estado === 'Retardo').length;
+        const totalRetardos = asistencias.filter(a => a.estado === 'Retardo').length;
+        
+        return {
+            id: clase.idGrupo,
+            name: clase.nombreMateria,
+            instructor: clase.Maestro?.Usuario?.nombre || "Sin Asignar",
+            attendance: totalAsistencias,
+            late: totalRetardos,
+            percentage: 100 
+        };
+      }));
+
+      return resumen;
+    } catch (error) {
+      console.error("Error resumen alumno:", error);
+      throw error;
+    }
+  }
+
+  static async getHistorialGrupo(idUsuarioInput, idGrupo) {
+    try {
+      const alumno = await Alumno.findOne({ where: { idUsuario: idUsuarioInput } });
+      if (!alumno) return [];
+
+      const historial = await Asistencia.findAll({
+        where: { idAlumno: alumno.idAlumno, idGrupo },
+        order: [['fechaHora', 'DESC']]
+      });
+
+      return historial.map(a => ({
+        id: a.idAsistencia,
+        date: DateTime.fromJSDate(a.fechaHora).setZone(TIMEZONE).toFormat("yyyy-MM-dd"),
+        time: DateTime.fromJSDate(a.fechaHora).setZone(TIMEZONE).toFormat("hh:mm a"),
+        status: a.estado
+      }));
+
+    } catch (error) {
+      console.error("Error historial grupo:", error);
       throw error;
     }
   }

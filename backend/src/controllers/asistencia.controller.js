@@ -10,19 +10,19 @@ export async function register(req, res) {
     const result = await AsistenciaService.registrarAsistencia({ idAlumno, idGrupo, latitud, longitud, precision, fechaHora });
 
     if (result.exito) {
-        return res.status(201).json({
-            ok: true,
-            message: result.mensaje, 
-            asistencia: result.asistencia,
-            estado: result.estadoFinal,
-        });
+      return res.status(201).json({
+        ok: true,
+        message: result.mensaje,
+        asistencia: result.asistencia,
+        estado: result.estadoFinal,
+      });
     } else {
-       return res.status(400).json({
-            ok: false,
-            error: result.mensaje,
-            asistencia: result.asistencia,
-            estado: result.estadoFinal 
-        });
+      return res.status(400).json({
+        ok: false,
+        error: result.mensaje,
+        asistencia: result.asistencia,
+        estado: result.estadoFinal
+      });
     }
   } catch (err) {
     console.error("Error registrar asistencia:", err);
@@ -37,9 +37,9 @@ export const getListaAsistencia = async (req, res) => {
     if (!idGrupo || !fecha) {
       return res.status(400).json({ error: "Faltan parámetros: idGrupo y fecha son requeridos" });
     }
-    
+
     const lista = await AsistenciaService.obtenerListaAsistencia(idGrupo, fecha);
-    
+
     res.json({
       ok: true,
       data: lista
@@ -57,11 +57,11 @@ export const updateAsistenciaManual = async (req, res) => {
     if (!idAlumno || !idGrupo || !fecha || !estado) {
       return res.status(400).json({ error: "Faltan campos requeridos" });
     }
-    
+
     const resultado = await AsistenciaService.registrarManual({
-      idAlumno, 
-      idGrupo, 
-      fechaStr: fecha, 
+      idAlumno,
+      idGrupo,
+      fechaStr: fecha,
       nuevoEstado: estado
     });
 
@@ -73,5 +73,24 @@ export const updateAsistenciaManual = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ ok: false, message: "Error al actualizar asistencia manual" });
+  }
+};
+
+export const getResumenAlumno = async (req, res) => {
+  try {
+    const resumen = await AsistenciaService.getResumenAlumno(req.user.id);
+    res.json({ ok: true, data: resumen });
+  } catch (error) {
+    res.status(500).json({ ok: false, message: error.message });
+  }
+};
+
+export const getHistorialGrupo = async (req, res) => {
+  try {
+    const { idGrupo } = req.params;
+    const historial = await AsistenciaService.getHistorialGrupo(req.user.id, idGrupo);
+    res.json({ ok: true, data: historial });
+  } catch (error) {
+    res.status(500).json({ ok: false, message: error.message });
   }
 };

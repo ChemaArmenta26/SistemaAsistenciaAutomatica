@@ -1,110 +1,98 @@
 "use client"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Header } from "@/components/layout/header"
-import { Users, TrendingUp } from "lucide-react"
+import { Users, Clock, MapPin, ArrowRight } from "lucide-react"
+import { getTeacherClassesTodayService, type TeacherClassItem } from "@/services/maestro.service"
+import { toast } from "sonner"
 
 interface TeacherDashboardProps {
   userName: string
-  onNavigate: (screen: string) => void
+  onNavigate: (screen: string, params?: any) => void
   onLogout: () => void
 }
 
 export function TeacherDashboard({ userName, onNavigate, onLogout }: TeacherDashboardProps) {
-  const myCourses = [
-    {
-      id: 1,
-      name: "Desarrollo Web Avanzado",
-      section: "Sección A",
-      students: 25,
-      avgAttendance: 87,
-      schedule: "Lunes, Miércoles, Viernes 10:00 AM",
-    },
-    {
-      id: 2,
-      name: "Base de Datos II",
-      section: "Sección B",
-      students: 22,
-      avgAttendance: 92,
-      schedule: "Martes, Jueves 12:00 PM",
-    },
-    {
-      id: 3,
-      name: "Seguridad Informática",
-      section: "Sección A",
-      students: 20,
-      avgAttendance: 85,
-      schedule: "Lunes, Miércoles 2:00 PM",
-    },
-  ]
+  const [classes, setClasses] = useState<TeacherClassItem[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const userStr = localStorage.getItem("user");
+        if (!userStr) {
+            toast.error("No hay sesión de usuario");
+            return;
+        }
+        const user = JSON.parse(userStr);
+        const teacherId = user.id;
+
+        const data = await getTeacherClassesTodayService(teacherId)
+        setClasses(data)
+      } catch (err: any) {
+        toast.error("Error al cargar tus cursos")
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [])
 
   return (
     <div className="min-h-screen bg-background">
       <Header userName={userName} onLogout={onLogout} role="teacher" />
 
-      <main className="max-w-2xl mx-auto p-4 pb-20">
-        <div className="space-y-4">
-          {/* Welcome Section */}
+      <main className="max-w-3xl mx-auto p-4 pb-20">
+        <div className="space-y-6">
           <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
             <CardHeader>
               <CardTitle>Bienvenido, {userName}</CardTitle>
-              <CardDescription>Gestiona tus cursos y asistencias</CardDescription>
+              <CardDescription>Gestiona tus cursos y asistencias de hoy</CardDescription>
             </CardHeader>
           </Card>
 
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 gap-3">
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Users className="w-4 h-4 text-primary" />
-                  <span className="text-xs text-muted-foreground">Total de Estudiantes</span>
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Users className="w-5 h-5 text-primary"/> Tus Cursos de Hoy
+            </h2>
+            
+            {loading ? (
+                <div className="text-center py-10 text-muted-foreground animate-pulse">Cargando cursos...</div>
+            ) : classes.length === 0 ? (
+                <div className="text-center py-12 border-2 border-dashed rounded-xl bg-muted/30">
+                    <p className="text-xl mb-2">📅</p>
+                    <p>No tienes clases asignadas para hoy.</p>
                 </div>
-                <div className="text-2xl font-bold">67</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp className="w-4 h-4 text-accent" />
-                  <span className="text-xs text-muted-foreground">Asistencia Promedio</span>
+            ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                    {classes.map((course) => (
+                    <Card
+                        key={course.id}
+                        className="hover:border-primary/50 transition-all cursor-pointer border-l-4 border-l-primary shadow-sm"
+                        onClick={() => onNavigate("teacher-attendance", { courseId: course.id })}
+                    >
+                        <CardContent className="pt-6">
+                        <div className="mb-4">
+                            <h3 className="font-bold text-lg leading-tight mb-1">{course.name}</h3>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <MapPin className="w-3 h-3" /> Aula: {course.room}
+                            </div>
+                        </div>
+                        
+                        <div className="flex items-center justify-between mt-4 pt-4 border-t border-dashed">
+                            <div className="flex items-center gap-1.5 text-sm font-medium bg-secondary/10 px-2 py-1 rounded text-primary">
+                                <Clock className="w-3.5 h-3.5" /> {course.time}
+                            </div>
+                            <Button size="sm" variant="ghost" className="h-8">
+                                Ver Lista <ArrowRight className="w-3 h-3 ml-1"/>
+                            </Button>
+                        </div>
+                        </CardContent>
+                    </Card>
+                    ))}
                 </div>
-                <div className="text-2xl font-bold">88%</div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* My Courses */}
-          <div className="space-y-2">
-            <h2 className="text-lg font-semibold">Mis Cursos</h2>
-            {myCourses.map((course) => (
-              <Card
-                key={course.id}
-                className="cursor-pointer hover:border-primary/50 transition-colors border-l-4 border-l-primary"
-              >
-                <CardContent className="pt-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-1">
-                      <h3 className="font-semibold">{course.name}</h3>
-                      <p className="text-sm text-muted-foreground">{course.section}</p>
-                    </div>
-                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                      {course.students} alumnos
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-3">{course.schedule}</p>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="text-sm">
-                      <span className="font-medium text-primary">{course.avgAttendance}%</span>
-                      <span className="text-muted-foreground ml-1">Asistencia Promedio</span>
-                    </div>
-                  </div>
-                  <Button onClick={() => onNavigate("teacher-attendance")} size="sm" className="w-full">
-                    Ver Asistencias
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+            )}
           </div>
         </div>
       </main>
