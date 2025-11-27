@@ -20,14 +20,15 @@ export async function getClasesHoy(req, res) {
   }
 }
 
-export const getClasesHoyMaestro = async (req, res) => {
+export const getClasesPorFechaMaestro = async (req, res) => {
   try {
-    const { idMaestro } = req.params;
+    const { idMaestro, fecha } = req.params;
 
     if (!idMaestro) {
       return res.status(400).json({ error: "Falta el ID del maestro" });
     }
-    const clases = await ClaseService.getClasesHoyMaestro(idMaestro);
+
+    const clases = await ClaseService.getClasesPorFechaMaestro(idMaestro, fecha);
     
     res.json({
       ok: true,

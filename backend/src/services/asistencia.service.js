@@ -186,7 +186,6 @@ class AsistenciaService {
 
   static async getResumenAlumno(idUsuarioInput) {
     try {
-
       const alumno = await Alumno.findOne({ where: { idUsuario: idUsuarioInput } });
       if (!alumno) return [];
 
@@ -208,16 +207,28 @@ class AsistenciaService {
             where: { idAlumno: alumno.idAlumno, idGrupo: clase.idGrupo }
         });
 
-        const totalAsistencias = asistencias.filter(a => a.estado === 'Presente' || a.estado === 'Retardo').length;
+        const totalRegistros = asistencias.length;
+        
+        const totalPositivas = asistencias.filter(a => 
+            ['Presente', 'Retardo', 'Justificado', 'Registrada'].includes(a.estado)
+        ).length;
+
         const totalRetardos = asistencias.filter(a => a.estado === 'Retardo').length;
         
+        let porcentaje = 0;
+        
+        if (totalRegistros > 0) {
+            porcentaje = Math.round((totalPositivas / totalRegistros) * 100);
+        }
+
         return {
             id: clase.idGrupo,
             name: clase.nombreMateria,
             instructor: clase.Maestro?.Usuario?.nombre || "Sin Asignar",
-            attendance: totalAsistencias,
-            late: totalRetardos,
-            percentage: 100 
+            attendance: totalPositivas, 
+            late: totalRetardos,        
+            totalClasses: totalRegistros, 
+            percentage: porcentaje     
         };
       }));
 

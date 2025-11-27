@@ -18,12 +18,12 @@ export interface StudentAttendanceItem {
   metodo: string;
 }
 
-// Obtener las clases que el maestro imparte hoy
-export const getTeacherClassesTodayService = async (teacherId: number): Promise<TeacherClassItem[]> => {
+// Obtener las clases de un maestro para una fecha específica
+export const getTeacherClassesByDateService = async (teacherId: number, date: string): Promise<TeacherClassItem[]> => {
   const token = localStorage.getItem("token");
   if (!token) throw new Error("No hay sesión activa.");
 
-  const response = await fetch(`${API_URL}/clases/maestro/hoy/${teacherId}`, {
+  const response = await fetch(`${API_URL}/clases/maestro/${teacherId}/${date}`, {
     headers: { 
       "Authorization": `Bearer ${token}`,
       "Cache-Control": "no-cache"

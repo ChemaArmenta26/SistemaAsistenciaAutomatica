@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Header } from "@/components/layout/header" 
-import { CheckCircle, Clock, MapPin, RefreshCw, AlertTriangle, CalendarDays, AlertCircle } from "lucide-react"
+import { CheckCircle, Clock, MapPin, RefreshCw, AlertTriangle, CalendarDays, AlertCircle, BookOpen, XCircle, FileCheck } from "lucide-react"
 import { toast } from "sonner"
 import { obtenerUbicacion } from "@/utils/geolocation"
 import { registrarAsistenciaService } from "@/services/asistencia.service"
@@ -12,7 +12,7 @@ import { getClassesTodayService, type ClassItem } from "@/services/clases.servic
 
 interface StudentDashboardProps {
   userName: string
-  onNavigate: (screen: string) => void
+  onNavigate: (screen: string, params?: any) => void
   onLogout: () => void
 }
 
@@ -21,9 +21,8 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
   const [classes, setClasses] = useState<ClassItem[]>([])
   const [loadingClasses, setLoadingClasses] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
- 
+  
   const [loadingActionId, setLoadingActionId] = useState<number | null>(null)
-
   const [localStatusUpdates, setLocalStatusUpdates] = useState<{[key: number]: string}>({})
 
   const loadData = async () => {
@@ -56,16 +55,13 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
     loadData()
   }, [])
 
-
   const handleCheckAttendance = async (classId: number) => {
     if (!studentId) return toast.error("Error de sesión", { description: "Recarga la página" })
 
     setLoadingActionId(classId)
 
     const promesaAsistencia = async () => {
-
       const coords = await obtenerUbicacion()
-
       const response = await registrarAsistenciaService({
         idAlumno: studentId,
         idGrupo: classId,
@@ -79,21 +75,15 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
     toast.promise(promesaAsistencia(), {
       loading: 'Verificando ubicación y horario...',
       success: (data: any) => {
-
         let nuevoEstado = data.estadoFinal;
-
         if (!nuevoEstado || nuevoEstado === 'Duplicada') {
             nuevoEstado = data.asistencia?.estado || 'Registrada';
         }
         
-        setLocalStatusUpdates(prev => ({ 
-            ...prev, 
-            [classId]: nuevoEstado 
-        }))
+        setLocalStatusUpdates(prev => ({ ...prev, [classId]: nuevoEstado }))
         return data.mensaje || `¡Asistencia Registrada!`
       },
       error: (err) => {
-
         if (err.message.includes("fuera de rango")) return "Estás demasiado lejos del aula 📍"
         if (err.message.includes("horario")) return "No es hora de clase 🕒"
         return `${err.message}` 
@@ -105,8 +95,9 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
   }
 
   const getStatusStyles = (status: string | null) => {
+    const s = status?.toLowerCase() || '';
 
-    if (status === 'Registrada' || status === 'Presente') return { 
+    if (s === 'registrada' || s === 'presente') return { 
         cardBorder: 'border-green-500 bg-green-50/30 shadow-sm', 
         btnVariant: "default" as const, 
         btnClass: 'bg-green-600 hover:bg-green-700 text-white opacity-100 cursor-not-allowed',
@@ -114,15 +105,31 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
         text: 'Asistencia Registrada'
     };
 
-    if (status === 'Retardo') return { 
+    if (s === 'retardo') return { 
         cardBorder: 'border-orange-400 bg-orange-50/40', 
         btnVariant: "default" as const,
         btnClass: 'bg-orange-500 hover:bg-orange-600 text-white opacity-100 cursor-not-allowed',
         icon: <AlertCircle className="w-5 h-5 mr-2" />,
         text: 'Registrado con Retardo'
     };
+    
+    if (s === 'justificado') return {
+        cardBorder: 'border-blue-400 bg-blue-50/40',
+        btnVariant: "default" as const,
+        btnClass: 'bg-blue-500 hover:bg-blue-600 text-white opacity-100 cursor-not-allowed',
+        icon: <FileCheck className="w-5 h-5 mr-2" />,
+        text: 'Asistencia Justificada'
+    };
 
-    return { 
+    if (s === 'falta' || s === 'ausente') return {
+        cardBorder: 'border-red-500 bg-red-50/30',
+        btnVariant: "destructive" as const,
+        btnClass: 'opacity-100 cursor-not-allowed',
+        icon: <XCircle className="w-5 h-5 mr-2" />,
+        text: 'Falta Registrada'
+    };
+
+     return { 
         cardBorder: 'hover:border-primary/50 hover:shadow-md', 
         btnVariant: "default" as const,
         btnClass: '',
@@ -138,24 +145,28 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
       <main className="max-w-2xl mx-auto p-4 pb-20">
         <div className="space-y-6">
           
-          {/* Tarjeta de Bienvenida */}
           <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5 shadow-sm">
             <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-full">
-                    <CalendarDays className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                    <CardTitle>Hola, {userName.split(" ")[0]}</CardTitle>
-                    <CardDescription className="capitalize">
-                        {new Date().toLocaleDateString("es-MX", { weekday: 'long', day: 'numeric', month: 'long' })}
-                    </CardDescription>
-                </div>
+              <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-full">
+                        <CalendarDays className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                        <CardTitle>Hola, {userName.split(" ")[0]}</CardTitle>
+                        <CardDescription className="capitalize">
+                            {new Date().toLocaleDateString("es-MX", { weekday: 'long', day: 'numeric', month: 'long' })}
+                        </CardDescription>
+                    </div>
+                  </div>
+                  
+                  <Button variant="outline" size="sm" onClick={() => onNavigate("student-history")}>
+                    <BookOpen className="w-4 h-4 mr-2"/> Historial
+                  </Button>
               </div>
             </CardHeader>
           </Card>
 
-          {/* Lista de Clases */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold">Tus Clases de Hoy</h2>
@@ -191,7 +202,6 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
 
             {!loadingClasses && classes.map((cls) => {
               const currentStatus = localStatusUpdates[cls.id] || cls.attendanceStatus;
-              
               const styles = getStatusStyles(currentStatus);
               const isLoading = loadingActionId === cls.id;
               const isActionDisabled = !!currentStatus || isLoading;

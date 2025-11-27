@@ -84,12 +84,16 @@ class ClaseService {
     }
   }
 
-  static async getClasesHoyMaestro(idUsuarioInput) {
-    const now = DateTime.now().setZone(TIMEZONE);
-    const diaHoy = now.weekday === 7 ? 0 : now.weekday;  
+  static async getClasesPorFechaMaestro(idUsuarioInput, fechaStr) {
+    const fechaBusqueda = fechaStr 
+        ? DateTime.fromISO(fechaStr, { zone: TIMEZONE }) 
+        : DateTime.now().setZone(TIMEZONE);
+
+    if (!fechaBusqueda.isValid) throw new Error("Fecha inválida");
+
+    let diaSemana = fechaBusqueda.weekday;
 
     try {
-
       const maestro = await Maestro.findOne({
         where: { idUsuario: idUsuarioInput }
       });
@@ -106,7 +110,7 @@ class ClaseService {
           {
             model: Horario,
             required: true,
-            where: { diaSemana: diaHoy },
+            where: { diaSemana: diaSemana }, 
             attributes: ['horaInicio', 'horaFin']
           }
         ]
@@ -124,7 +128,7 @@ class ClaseService {
       }).sort((a, b) => a.horaInicioRaw.localeCompare(b.horaInicioRaw));
 
     } catch (error) {
-      console.error("Error en getClasesHoyMaestro:", error);
+      console.error("Error en getClasesPorFechaMaestro:", error);
       throw error;
     }
   }

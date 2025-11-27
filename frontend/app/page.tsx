@@ -14,6 +14,7 @@ export default function Home() {
   const [userRole, setUserRole] = useState<UserRole>(null)
   const [currentScreen, setCurrentScreen] = useState<Screen>("login")
   const [userName, setUserName] = useState("")
+  const [navigationParams, setNavigationParams] = useState<any>({})
 
   const handleLogin = (role: "student" | "teacher", name: string) => {
     setUserRole(role)
@@ -27,8 +28,9 @@ export default function Home() {
     setUserName("")
   }
 
-  const navigateTo = (screen: Screen) => {
-    setCurrentScreen(screen)
+  const navigateTo = (screen: string, params?: any) => {
+    setCurrentScreen(screen as Screen)
+    setNavigationParams(params || {})
   }
 
   return (
@@ -42,7 +44,7 @@ export default function Home() {
       ) : currentScreen === "teacher-dashboard" ? (
         <TeacherDashboard userName={userName} onNavigate={navigateTo} onLogout={handleLogout} />
       ) : (
-        <TeacherAttendance userName={userName} onNavigate={navigateTo} onLogout={handleLogout} />
+        <TeacherAttendance userName={userName} onNavigate={navigateTo} onLogout={handleLogout} initialCourseId={navigationParams.courseId} />
       )}
     </div>
   )
