@@ -1,13 +1,10 @@
 import AsistenciaService from "../services/asistencia.service.js";
-import { Alumno } from "../models/index.js"; // <--- Necesario para buscar el ID real
+import { Alumno } from "../models/index.js";
 
-// 1. REGISTRAR ASISTENCIA (Blindado)
 export const register = async (req, res) => {
   try {
     const { idGrupo, latitud, longitud, precision } = req.body;
 
-    // --- SEGURIDAD CRÍTICA ---
-    // Ignoramos el req.body.idAlumno porque el frontend puede equivocarse.
     // Obtenemos el ID del usuario directamente del token de sesión.
     const idUsuarioLogueado = req.user.id; 
 
@@ -18,18 +15,17 @@ export const register = async (req, res) => {
         return res.status(404).json({ ok: false, message: "No se encontró el perfil de alumno para este usuario." });
     }
 
-    // Llamamos al servicio usando el ID VERIFICADO (alumnoReal.idAlumno)
+    // Llamamos al servicio usando el ID VERIFICADO
     const result = await AsistenciaService.registrarAsistencia({
       idAlumno: alumnoReal.idAlumno, 
       idGrupo,
       latitud,
       longitud,
       precision,
-      fechaHora: new Date().toISOString() // Usamos hora del servidor
+      fechaHora: new Date().toISOString()
     });
 
     if (!result.exito) {
-      // Si es duplicada devolvemos 200 para no generar error en frontend, si es otro error devolvemos 400
       const status = result.estadoFinal === "Duplicada" ? 200 : 400;
       return res.status(status).json(result);
     }
@@ -45,15 +41,18 @@ export const register = async (req, res) => {
 // 2. OBTENER LISTA (Para el maestro)
 export const getListaAsistencia = async (req, res) => {
   try {
-    const { idGrupo } = req.params;
-    const { fecha } = req.query; // Formato YYYY-MM-DD
+    // CORRECCIÓN AQUÍ: Usamos req.params para 'fecha' porque la URL es /lista/:idGrupo/:fecha
+    const { idGrupo, fecha } = req.params; 
 
     if (!fecha) {
       return res.status(400).json({ message: "Se requiere la fecha" });
     }
 
     const lista = await AsistenciaService.obtenerListaAsistencia(idGrupo, fecha);
-    res.json(lista);
+    res.json({
+        ok: true,
+        data: lista
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error al obtener la lista" });
@@ -82,7 +81,7 @@ export const updateAsistenciaManual = async (req, res) => {
 // 4. RESUMEN ALUMNO (Dashboard Alumno)
 export const getResumenAlumno = async (req, res) => {
     try {
-        const idUsuario = req.user.id; // ID del token
+        const idUsuario = req.user.id;
         const resumen = await AsistenciaService.getResumenAlumno(idUsuario);
         res.json({ ok: true, data: resumen });
     } catch (error) {
@@ -97,7 +96,6 @@ export const getHistorialGrupo = async (req, res) => {
     const { idGrupo } = req.params;
     const { fechaInicio, fechaFin } = req.query; 
 
-    // Pasamos req.user.id para que el servicio busque al alumno correcto
     const historial = await AsistenciaService.getHistorialGrupo(req.user.id, idGrupo, fechaInicio, fechaFin);
     res.json({ ok: true, data: historial });
   } catch (error) {

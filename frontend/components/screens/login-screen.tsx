@@ -1,132 +1,106 @@
 "use client"
 
-import type React from "react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react"
 import { loginService } from "@/services/auth.service"
 import { toast } from "sonner"
 
 interface LoginScreenProps {
-  onLogin: (role: "student" | "teacher", name: string, token: string) => void
+  onNavigate: (screen: string) => void
 }
 
-export function LoginScreen({ onLogin }: LoginScreenProps) {
+// IMPORTANTE: Asegúrate de que 'onNavigate' esté entre llaves { }
+export function LoginScreen({ onNavigate }: LoginScreenProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [userType, setUserType] = useState<"student" | "teacher">("student")
-  
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null) 
-
-    if (!email.trim() || !password.trim()) {
-      setError("Por favor, ingresa tu correo y contraseña.")
-      return
-    }
-
     setLoading(true)
 
     try {
-      const data = await loginService(email, password)
-      const { token, user } = data
+      const response = await loginService(email, password)
       
-      const userRoleLower = user.rol.toLowerCase()
-
-      localStorage.setItem("token", token)
-      localStorage.setItem("user", JSON.stringify(user))
-
-      toast.success(`Bienvenido de nuevo, ${user.nombre.split(" ")[0]}`)
-
-      const finalRole = userRoleLower.includes("alumno") ? "student" : "teacher"
-      onLogin(finalRole, user.nombre, token)
-
-    } catch (err: any) {
-      const msg = err.message || "Error de conexión con el servidor"
-      setError(msg)
-      toast.error(msg)
+      localStorage.setItem("token", response.token)
+      localStorage.setItem("user", JSON.stringify(response.user))
+      
+      toast.success(`Bienvenido, ${response.user.nombre.split(" ")[0]}`)
+      
+      // Aquí es donde se llama a onNavigate
+      if (response.user.rol === "Maestro") {
+        onNavigate("teacher-dashboard")
+      } else {
+        onNavigate("student-dashboard")
+      }
+    } catch (error: any) {
+      const mensajeError = error.message || "Error al iniciar sesión";
+      toast.error("No pudimos iniciar sesión", {
+        description: mensajeError, 
+        duration: 4000,
+      });
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/10 via-background to-accent/10 px-4">
-      <Card className="w-full max-w-md shadow-lg border-t-4 border-t-primary">
-        <CardHeader className="space-y-1 text-center">
-          <div className="mx-auto mb-4 w-12 h-12 rounded-lg bg-primary text-primary-foreground flex items-center justify-center text-2xl font-bold shadow-sm">
-            IT
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
+      <Card className="w-full max-w-md shadow-xl border-0">
+        <CardHeader className="space-y-1 text-center pb-8">
+          <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+            <Lock className="w-6 h-6 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold">ITSON Asistencias</CardTitle>
-          <CardDescription>Ingresa tus credenciales institucionales</CardDescription>
+          <CardTitle className="text-2xl font-bold tracking-tight">Iniciar Sesión</CardTitle>
+          <CardDescription>
+            Sistema de Asistencia Automática ITSON
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            
-            {/* Selector de Rol */}
-            <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-lg">
-              <Button
-                type="button"
-                variant={userType === "student" ? "default" : "ghost"}
-                onClick={() => setUserType("student")}
-                className="w-full rounded-md transition-all"
-                disabled={loading}
-              >
-                Alumno
-              </Button>
-              <Button
-                type="button"
-                variant={userType === "teacher" ? "default" : "ghost"}
-                onClick={() => setUserType("teacher")}
-                className="w-full rounded-md transition-all"
-                disabled={loading}
-              >
-                Maestro
-              </Button>
-            </div>
-
-            <div className="space-y-3 pt-2">
-              <div className="space-y-1">
-                <label className="text-sm font-medium pl-1">Correo Institucional</label>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Correo Institucional</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
+                  id="email"
                   type="email"
-                  placeholder={userType === "student" ? "id@potros.itson.edu.mx" : "nombre@itson.edu.mx"}
+                  placeholder="nombre@potros.itson.edu.mx"
+                  className="pl-9"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  disabled={loading}
-                  className="bg-background/50"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-medium pl-1">Contraseña</label>
-                <Input
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={loading}
-                  className="bg-background/50"
+                  required
                 />
               </div>
             </div>
-
-            {error && (
-              <div className="text-sm text-red-600 text-center font-medium bg-red-50 p-3 rounded-md border border-red-100 animate-in fade-in slide-in-from-top-1">
-                {error}
+            <div className="space-y-2">
+              <Label htmlFor="password">Contraseña</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  className="pl-9 pr-9"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
-            )}
-
-            <Button type="submit" className="w-full mt-6 text-base" size="lg" disabled={loading}>
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  Validando...
-                </span>
-              ) : "Iniciar Sesión"}
+            </div>
+            <Button className="w-full mt-6" type="submit" disabled={loading}>
+              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Iniciando...</> : "Entrar"}
             </Button>
           </form>
         </CardContent>

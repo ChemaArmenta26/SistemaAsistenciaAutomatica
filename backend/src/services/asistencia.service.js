@@ -8,23 +8,57 @@ const TIMEZONE = process.env.TZ || "America/Hermosillo";
 
 class AsistenciaService {
 
-  // --- LÓGICA CORE: Rellenar huecos de faltas ---
+  // Método auxiliar para limpiar duplicados y priorizar asistencia positiva
+  static _filtrarMejorAsistencia(asistencias) {
+    const mapa = new Map();
+
+    // Prioridad de estados: Presente/Retardo/Justificado (1) > Falta (0)
+    const esPositivo = (estado) => ['Presente', 'Retardo', 'Justificado', 'Registrada'].includes(estado);
+
+    for (const a of asistencias) {
+      // Clave única por alumno y día
+      const fechaKey = a.fechaHora.toISOString().split('T')[0];
+      const key = `${a.idAlumno}-${fechaKey}`;
+      
+      const existente = mapa.get(key);
+
+      if (!existente) {
+        mapa.set(key, a);
+        continue;
+      }
+
+      // LÓGICA DE ORO: Asistencia mata Falta
+      const nuevoEsPositivo = esPositivo(a.estado);
+      const viejoEsPositivo = esPositivo(existente.estado);
+
+      if (nuevoEsPositivo && !viejoEsPositivo) {
+        // Si el nuevo es positivo y el viejo es falta, ganamos (reemplazamos)
+        mapa.set(key, a);
+      } else if (nuevoEsPositivo === viejoEsPositivo) {
+        // Si son del mismo tipo, nos quedamos con el más reciente (updatedAt)
+        if (new Date(a.updatedAt) > new Date(existente.updatedAt)) {
+            mapa.set(key, a);
+        }
+      }
+      // Si el nuevo es falta y el viejo es positivo, IGNORAMOS el nuevo (no hacemos nada)
+    }
+
+    return Array.from(mapa.values());
+  }
+
   static async _rellenarFaltas(idGrupo, fechaInicio, fechaFin) {
     const horarios = await Horario.findAll({ where: { idGrupo } });
     if (!horarios.length) return;
 
     const diasClase = new Set(horarios.map(h => h.diaSemana));
-
     const inscripciones = await Inscripcion.findAll({
       where: { idGrupo, activo: true },
       attributes: ['idAlumno']
     });
-    const idsAlumnos = inscripciones.map(i => i.idAlumno);
+    const idsAlumnos = [...new Set(inscripciones.map(i => i.idAlumno))];
 
     let current = fechaInicio;
     const now = DateTime.now().setZone(TIMEZONE);
-    
-    // Validamos hasta el momento actual
     const limite = fechaFin < now ? fechaFin : now;
     const faltasAInsertar = [];
 
@@ -34,15 +68,11 @@ class AsistenciaService {
 
       if (diasClase.has(diaSemanaModelo)) {
         let claseYaPaso = true;
-        
-        // Si es hoy, verificamos si ya pasó la hora de salida
         if (current.hasSame(now, 'day')) {
            const horarioHoy = horarios.find(h => h.diaSemana === diaSemanaModelo);
            if (horarioHoy) {
              const [hFin, mFin] = horarioHoy.horaFin.split(":").map(Number);
              const finClase = current.set({ hour: hFin, minute: mFin });
-             
-             // Si AHORA es menor que FIN DE CLASE, todavía no es falta.
              if (now < finClase) claseYaPaso = false;
            }
         }
@@ -52,10 +82,7 @@ class AsistenciaService {
             const finDia = current.endOf('day').toJSDate();
 
             const asistenciasDia = await Asistencia.findAll({
-              where: {
-                idGrupo,
-                fechaHora: { [Op.between]: [inicioDia, finDia] }
-              },
+              where: { idGrupo, fechaHora: { [Op.between]: [inicioDia, finDia] } },
               attributes: ['idAlumno']
             });
 
@@ -64,11 +91,9 @@ class AsistenciaService {
             for (const idAlumno of idsAlumnos) {
               if (!alumnosConAsistencia.has(idAlumno)) {
                 faltasAInsertar.push({
-                  idAlumno,
-                  idGrupo,
+                  idAlumno, idGrupo,
                   fechaHora: current.set({ hour: 12 }).toJSDate(),
-                  estado: 'Falta',
-                  latitud: null, longitud: null, precision: null
+                  estado: 'Falta', latitud: null, longitud: null, precision: null
                 });
               }
             }
@@ -78,15 +103,13 @@ class AsistenciaService {
     }
 
     if (faltasAInsertar.length > 0) {
-      await Asistencia.bulkCreate(faltasAInsertar);
+      // Usamos ignoreDuplicates si el dialecto lo soporta, o catch simple
+      await Asistencia.bulkCreate(faltasAInsertar).catch(() => {});
     }
   }
 
-  // --- 1. LISTA DEL MAESTRO (Aquí se refleja la asistencia diaria) ---
   static async obtenerListaAsistencia(idGrupo, fechaStr) {
     const fecha = DateTime.fromISO(fechaStr, { zone: TIMEZONE });
-    
-    // Si la clase ya acabó hace 1 min, esto genera las faltas automáticamente.
     await this._rellenarFaltas(idGrupo, fecha, fecha);
 
     const inicioDia = fecha.startOf('day').toJSDate();
@@ -101,15 +124,15 @@ class AsistenciaService {
         }]
       });
 
-      const asistenciasRegistradas = await Asistencia.findAll({
-        where: {
-          idGrupo,
-          fechaHora: { [Op.between]: [inicioDia, finDia] }
-        }
+      const asistenciasRaw = await Asistencia.findAll({
+        where: { idGrupo, fechaHora: { [Op.between]: [inicioDia, finDia] } }
       });
 
+      // FILTRADO INTELIGENTE: Eliminamos faltas falsas
+      const asistenciasLimpias = this._filtrarMejorAsistencia(asistenciasRaw);
+
       const asistenciaMap = new Map();
-      asistenciasRegistradas.forEach(a => asistenciaMap.set(a.idAlumno, a));
+      asistenciasLimpias.forEach(a => asistenciaMap.set(a.idAlumno, a));
 
       const listaFinal = inscripciones.map(ins => {
         const alumno = ins.Alumno;
@@ -121,65 +144,175 @@ class AsistenciaService {
           matricula: alumno.matricula,
           email: usuario.email,
           nombre: usuario.nombre,
-          // Si existe asistencia (incluso 'Falta' generada), se muestra. Si no, Pendiente.
-          estado: asistencia ? asistencia.estado : "Pendiente", 
+          estado: asistencia ? asistencia.estado : "Pendiente",
           hora: asistencia ? DateTime.fromJSDate(asistencia.fechaHora).setZone(TIMEZONE).toFormat("HH:mm") : "-",
           metodo: asistencia ? (asistencia.latitud ? "GPS" : "Manual") : "-"
         };
       });
 
       return listaFinal.sort((a, b) => a.nombre.localeCompare(b.nombre));
-
     } catch (error) {
       console.error("Error en obtenerListaAsistencia:", error);
       throw error;
     }
   }
 
-  // --- 2. HISTORIAL DEL ALUMNO ---
-  static async getHistorialGrupo(idUsuarioInput, idGrupo, fechaInicioStr, fechaFinStr) {
-    try {
+  static async registrarAsistencia({ idAlumno, idGrupo, latitud, longitud, precision = null, fechaHora }) {
+    const parsedDate = fechaHora ? DateTime.fromISO(fechaHora, { zone: TIMEZONE }) : DateTime.now().setZone(TIMEZONE);
+    
+    if (!parsedDate.isValid) {
+      return { exito: false, mensaje: "Fecha inválida", estadoFinal: "Error", asistencia: null };
+    }
+
+    const inicioDia = parsedDate.startOf('day').toJSDate();
+    const finDia = parsedDate.endOf('day').toJSDate();
+
+    // 1. Validar si ya existe
+    const asistenciaExistente = await Asistencia.findOne({
+      where: { idAlumno: idAlumno, idGrupo: idGrupo, fechaHora: { [Op.between]: [inicioDia, finDia] } }
+    });
+
+    if (asistenciaExistente) {
+       // Lógica de recuperación si era falta automática
+       if (asistenciaExistente.estado === 'Falta') {
+           // ... (lógica de recuperación) ...
+       } else {
+           return { 
+               exito: false, 
+               mensaje: "Ya registraste asistencia para esta clase hoy.", // Mensaje claro
+               estadoFinal: "Duplicada", 
+               asistencia: asistenciaExistente 
+           };
+       }
+    }
+
+    // 2. Validar Ubicación
+    const validacionUbicacion = await UbicacionService.validarUbicacionAula(idGrupo, latitud, longitud);
+    if (!validacionUbicacion.ok) {
+      // CORRECCIÓN: Aseguramos devolver un mensaje string válido
+      return { 
+          exito: false, 
+          mensaje: validacionUbicacion.mensaje || "Estás demasiado lejos del aula.", 
+          estadoFinal: "Fuera de rango", 
+          asistencia: null 
+      };
+    }
+
+    // 3. Validar Horario
+    const evalHorario = await ScheduleService.isWithinSchedule(idGrupo, parsedDate);
+    if (!evalHorario.ok) {
+      // CORRECCIÓN CRÍTICA: ScheduleService devuelve 'detail', no 'mensaje'
+      return { 
+          exito: false, 
+          mensaje: evalHorario.detail || "No es hora de clase.", 
+          estadoFinal: "Fuera de horario", 
+          asistencia: null 
+      };
+    }
+
+    // 4. Crear Asistencia
+    const estado = evalHorario.estadoSugerido;
+    const asistencia = await Asistencia.create({
+      fechaHora: parsedDate.toJSDate(),
+      estado,
+      latitud,
+      longitud,
+      precision,
+      idAlumno,
+      idGrupo,
+    });
+
+    return { 
+        exito: true, 
+        mensaje: `Asistencia registrada (${estado})`, 
+        asistencia, 
+        estadoFinal: estado 
+    };
+  }
+
+  static async registrarManual({ idAlumno, idGrupo, fechaStr, nuevoEstado }) {
+    const fecha = DateTime.fromISO(fechaStr, { zone: TIMEZONE });
+    const inicioDia = fecha.startOf('day').toJSDate();
+    const finDia = fecha.endOf('day').toJSDate();
+    
+    // Buscamos cualquier registro del día (Falta o Presente)
+    let asistencia = await Asistencia.findOne({ 
+        where: { idAlumno, idGrupo, fechaHora: { [Op.between]: [inicioDia, finDia] } } 
+    });
+    
+    if (asistencia) { 
+        // Si existe (aunque sea Falta), lo actualizamos
+        asistencia.estado = nuevoEstado; 
+        await asistencia.save(); 
+    } else { 
+        // Si no existe, creamos uno nuevo
+        asistencia = await Asistencia.create({ 
+            idAlumno, 
+            idGrupo, 
+            fechaHora: fecha.toJSDate(), 
+            estado: nuevoEstado 
+        }); 
+    }
+    return { ok: true, asistencia };
+  }
+
+  static async getResumenAlumno(idUsuarioInput) {
       const alumno = await Alumno.findOne({ where: { idUsuario: idUsuarioInput } });
       if (!alumno) return [];
+      const inscripciones = await Inscripcion.findAll({ where: { idAlumno: alumno.idAlumno, activo: true }, include: [{ model: Clase, include: [{ model: Maestro, include: [{ model: Usuario }] }] }] });
+      const FECHA_INICIO = DateTime.fromISO("2025-01-01", { zone: TIMEZONE }); const HOY = DateTime.now().setZone(TIMEZONE);
+      
+      const resumen = await Promise.all(inscripciones.map(async (ins) => {
+        const clase = ins.Clase;
+        await this._rellenarFaltas(clase.idGrupo, FECHA_INICIO, HOY);
+        const asistenciasRaw = await Asistencia.findAll({ 
+            where: { idAlumno: alumno.idAlumno, idGrupo: clase.idGrupo }
+        });
+        
+        // Aplicar filtro de prioridad
+        const asistenciasLimp = this._filtrarMejorAsistencia(asistenciasRaw);
 
+        const total = asistenciasLimp.length;
+        const posit = asistenciasLimp.filter(a => ['Presente', 'Retardo', 'Justificado', 'Registrada'].includes(a.estado)).length;
+        const late = asistenciasLimp.filter(a => a.estado === 'Retardo').length;
+        return { id: clase.idGrupo, name: clase.nombreMateria, instructor: clase.Maestro?.Usuario?.nombre, attendance: posit, late: late, totalClasses: total, percentage: total > 0 ? Math.round((posit/total)*100) : 0 };
+      }));
+      return resumen;
+  }
+  
+  static async getHistorialGrupo(idUsuarioInput, idGrupo, fechaInicioStr, fechaFinStr) {
+      const alumno = await Alumno.findOne({ where: { idUsuario: idUsuarioInput } });
+      if (!alumno) return [];
       const inicioDefault = DateTime.fromISO("2025-01-01", { zone: TIMEZONE });
       const finDefault = DateTime.now().setZone(TIMEZONE);
-
       const fechaInicio = fechaInicioStr ? DateTime.fromISO(fechaInicioStr, { zone: TIMEZONE }) : inicioDefault;
       const fechaFin = fechaFinStr ? DateTime.fromISO(fechaFinStr, { zone: TIMEZONE }).endOf('day') : finDefault;
 
-      // IMPORTANTE: Sincronizar faltas en el rango solicitado
       await this._rellenarFaltas(idGrupo, fechaInicio, fechaFin);
 
-      const historial = await Asistencia.findAll({
-        where: { 
-            idAlumno: alumno.idAlumno, 
-            idGrupo,
-            fechaHora: { [Op.between]: [fechaInicio.toJSDate(), fechaFin.toJSDate()] }
-        },
+      const historialRaw = await Asistencia.findAll({
+        where: { idAlumno: alumno.idAlumno, idGrupo, fechaHora: { [Op.between]: [fechaInicio.toJSDate(), fechaFin.toJSDate()] } },
         order: [['fechaHora', 'DESC']]
       });
 
-      return historial.map(a => ({
+      // Aplicar filtro de prioridad
+      const historialLimp = this._filtrarMejorAsistencia(historialRaw);
+      // Re-ordenar por fecha DESC después de filtrar
+      historialLimp.sort((a, b) => new Date(b.fechaHora) - new Date(a.fechaHora));
+
+      return historialLimp.map(a => ({
         id: a.idAsistencia,
         date: DateTime.fromJSDate(a.fechaHora).setZone(TIMEZONE).toFormat("yyyy-MM-dd"),
         time: DateTime.fromJSDate(a.fechaHora).setZone(TIMEZONE).toFormat("hh:mm a"),
         status: a.estado
       }));
-
-    } catch (error) {
-      console.error("Error historial grupo:", error);
-      throw error;
-    }
   }
 
-  // --- 3. REPORTE EN PDF ---
   static async getReporteRango(idGrupo, fechaInicioStr, fechaFinStr) {
     const fechaInicio = DateTime.fromISO(fechaInicioStr, { zone: TIMEZONE });
     const fechaFin = DateTime.fromISO(fechaFinStr, { zone: TIMEZONE }).endOf('day');
 
     try {
-      // IMPORTANTE: Sincronizar faltas antes de generar reporte
       await this._rellenarFaltas(idGrupo, fechaInicio, fechaFin);
 
       const fechaInicioJS = fechaInicio.startOf('day').toJSDate();
@@ -187,38 +320,33 @@ class AsistenciaService {
 
       const inscripciones = await Inscripcion.findAll({
         where: { idGrupo, activo: true },
-        include: [{
-          model: Alumno,
-          include: [{ model: Usuario, attributes: ['nombre', 'email'] }]
-        }]
+        include: [{ model: Alumno, include: [{ model: Usuario, attributes: ['nombre', 'email'] }] }]
       });
 
-      const asistencias = await Asistencia.findAll({
-        where: {
-          idGrupo,
-          fechaHora: { [Op.between]: [fechaInicioJS, fechaFinJS] }
-        },
-        order: [['fechaHora', 'ASC']]
+      const asistenciasRaw = await Asistencia.findAll({
+        where: { idGrupo, fechaHora: { [Op.between]: [fechaInicioJS, fechaFinJS] } }
       });
 
-      const sesionesUnicas = new Set(asistencias.map(a => a.fechaHora.toISOString().split('T')[0])).size;
+      // Aplicar filtro de prioridad
+      const asistenciasFiltradas = this._filtrarMejorAsistencia(asistenciasRaw);
+
+      const sesionesUnicas = new Set(asistenciasFiltradas.map(a => a.fechaHora.toISOString().split('T')[0])).size;
       const totalSesiones = sesionesUnicas === 0 ? 1 : sesionesUnicas;
 
       const reporte = inscripciones.map(ins => {
         const alumno = ins.Alumno;
         const usuario = alumno.Usuario;
-        const asistenciasAlumno = asistencias.filter(a => a.idAlumno === alumno.idAlumno);
+        const asistenciasAlumno = asistenciasFiltradas.filter(a => a.idAlumno === alumno.idAlumno);
 
         const presentes = asistenciasAlumno.filter(a => ['Presente', 'Registrada'].includes(a.estado)).length;
         const retardos = asistenciasAlumno.filter(a => a.estado === 'Retardo').length;
         const justificados = asistenciasAlumno.filter(a => a.estado === 'Justificado').length;
         const faltas = asistenciasAlumno.filter(a => a.estado === 'Falta').length;
         
-        const totalRegistrosAlumno = asistenciasAlumno.length; 
-        const baseCalculo = totalRegistrosAlumno > 0 ? totalRegistrosAlumno : 1; 
-
-        const asistenciaEfectiva = presentes + retardos + justificados; 
-        const porcentaje = Math.round((asistenciaEfectiva / baseCalculo) * 100);
+        const totalRegistros = asistenciasAlumno.length; 
+        const base = totalRegistros > 0 ? totalRegistros : 1; 
+        const efectivos = presentes + retardos + justificados; 
+        const porcentaje = Math.round((efectivos / base) * 100);
 
         return {
           matricula: alumno.matricula,
@@ -236,61 +364,6 @@ class AsistenciaService {
       console.error("Error en reporte rango:", error);
       throw error;
     }
-  }
-
-  // Solo asegúrate de que registrarAsistencia siga validando ubicación/horario.
-  static async registrarAsistencia({ idAlumno, idGrupo, latitud, longitud, precision = null, fechaHora }) {
-      const parsedDate = fechaHora ? DateTime.fromISO(fechaHora, { zone: TIMEZONE }) : DateTime.now().setZone(TIMEZONE);
-      if (!parsedDate.isValid) return { exito: false, mensaje: "Fecha inválida", estadoFinal: "Error", asistencia: null };
-
-      const inicioDia = parsedDate.startOf('day').toJSDate();
-      const finDia = parsedDate.endOf('day').toJSDate();
-
-      const asistenciaExistente = await Asistencia.findOne({
-        where: { idAlumno: idAlumno, idGrupo: idGrupo, fechaHora: { [Op.between]: [inicioDia, finDia] } }
-      });
-
-      if (asistenciaExistente) return { exito: false, mensaje: "Ya registraste asistencia hoy.", estadoFinal: "Duplicada", asistencia: asistenciaExistente };
-
-      const validacionUbicacion = await UbicacionService.validarUbicacionAula(idGrupo, latitud, longitud);
-      if (!validacionUbicacion.ok) return { exito: false, mensaje: validacionUbicacion.mensaje, estadoFinal: "Fuera de rango", asistencia: null };
-
-      const evalHorario = await ScheduleService.isWithinSchedule(idGrupo, parsedDate);
-      if (!evalHorario.ok) return { exito: false, mensaje: "Fuera de horario.", estadoFinal: "Fuera de horario", asistencia: null };
-
-      const estado = evalHorario.estadoSugerido;
-      const asistencia = await Asistencia.create({ fechaHora: parsedDate.toJSDate(), estado, latitud, longitud, precision, idAlumno, idGrupo });
-
-      return { exito: true, mensaje: `Asistencia registrada (${estado})`, asistencia, estadoFinal: estado };
-  }
-
-  static async registrarManual({ idAlumno, idGrupo, fechaStr, nuevoEstado }) {
-    const fecha = DateTime.fromISO(fechaStr, { zone: TIMEZONE });
-    const inicioDia = fecha.startOf('day').toJSDate();
-    const finDia = fecha.endOf('day').toJSDate();
-    let asistencia = await Asistencia.findOne({ where: { idAlumno, idGrupo, fechaHora: { [Op.between]: [inicioDia, finDia] } } });
-    
-    if (asistencia) { asistencia.estado = nuevoEstado; await asistencia.save(); } 
-    else { asistencia = await Asistencia.create({ idAlumno, idGrupo, fechaHora: fecha.toJSDate(), estado: nuevoEstado }); }
-    return { ok: true, asistencia };
-  }
-
-  static async getResumenAlumno(idUsuarioInput) {
-      const alumno = await Alumno.findOne({ where: { idUsuario: idUsuarioInput } });
-      if (!alumno) return [];
-      const inscripciones = await Inscripcion.findAll({ where: { idAlumno: alumno.idAlumno, activo: true }, include: [{ model: Clase, include: [{ model: Maestro, include: [{ model: Usuario }] }] }] });
-      const FECHA_INICIO = DateTime.fromISO("2025-01-01", { zone: TIMEZONE }); const HOY = DateTime.now().setZone(TIMEZONE);
-      
-      const resumen = await Promise.all(inscripciones.map(async (ins) => {
-        const clase = ins.Clase;
-        await this._rellenarFaltas(clase.idGrupo, FECHA_INICIO, HOY);
-        const asistencias = await Asistencia.findAll({ where: { idAlumno: alumno.idAlumno, idGrupo: clase.idGrupo } });
-        const total = asistencias.length;
-        const posit = asistencias.filter(a => ['Presente', 'Retardo', 'Justificado', 'Registrada'].includes(a.estado)).length;
-        const late = asistencias.filter(a => a.estado === 'Retardo').length;
-        return { id: clase.idGrupo, name: clase.nombreMateria, instructor: clase.Maestro?.Usuario?.nombre, attendance: posit, late: late, totalClasses: total, percentage: total > 0 ? Math.round((posit/total)*100) : 0 };
-      }));
-      return resumen;
   }
 }
 

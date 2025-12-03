@@ -1,51 +1,124 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { LoginScreen } from "@/components/screens/login-screen"
 import { StudentDashboard } from "@/components/screens/student-dashboard"
 import { TeacherDashboard } from "@/components/screens/teacher-dashboard"
-import { StudentHistory } from "@/components/screens/student-history"
 import { TeacherAttendance } from "@/components/screens/teacher-attendance"
-
-type UserRole = "student" | "teacher" | null
-type Screen = "login" | "student-dashboard" | "student-history" | "teacher-dashboard" | "teacher-attendance"
+import { StudentHistory } from "@/components/screens/student-history"
+import { TeacherSchedule } from "@/components/screens/teacher-schedule"
 
 export default function Home() {
-  const [userRole, setUserRole] = useState<UserRole>(null)
-  const [currentScreen, setCurrentScreen] = useState<Screen>("login")
-  const [userName, setUserName] = useState("")
-  const [navigationParams, setNavigationParams] = useState<any>({})
+  const [currentScreen, setCurrentScreen] = useState("login")
+  const [user, setUser] = useState<any>(null)
 
-  const handleLogin = (role: "student" | "teacher", name: string) => {
-    setUserRole(role)
-    setUserName(name)
-    setCurrentScreen(role === "student" ? "student-dashboard" : "teacher-dashboard")
+  // 1. Cargar sesión al inicio
+  useEffect(() => {
+    const token = localStorage.getItem("token")
+    const userStr = localStorage.getItem("user")
+    
+    if (token && userStr) {
+      try {
+        const userData = JSON.parse(userStr)
+        setUser(userData)
+        
+        // Redirección automática si ya hay sesión
+        if (userData.rol === "Maestro") {
+          setCurrentScreen("teacher-dashboard")
+        } else {
+          setCurrentScreen("student-dashboard")
+        }
+      } catch (e) {
+        handleLogout()
+      }
+    }
+  }, [])
+
+  // 2. Funciones de Navegación
+  const handleNavigate = (screen: string) => {
+    setCurrentScreen(screen)
   }
 
   const handleLogout = () => {
-    setUserRole(null)
+    localStorage.removeItem("token")
+    localStorage.removeItem("user")
+    setUser(null)
     setCurrentScreen("login")
-    setUserName("")
   }
 
-  const navigateTo = (screen: string, params?: any) => {
-    setCurrentScreen(screen as Screen)
-    setNavigationParams(params || {})
+  // Actualizar el estado del usuario inmediatamente después del login
+  const handleLoginSuccess = () => {
+    const userStr = localStorage.getItem("user")
+    if (userStr) {
+        setUser(JSON.parse(userStr))
+    }
+  }
+
+  // 3. Renderizado de Pantallas
+  const renderScreen = () => {
+    switch (currentScreen) {
+      case "login":
+        return (
+          <LoginScreen 
+            onNavigate={(screen) => {
+                handleLoginSuccess() 
+                handleNavigate(screen)
+            }} 
+          />
+        )
+
+      // --- ALUMNO ---
+      case "student-dashboard":
+        return (
+          <StudentDashboard
+            userName={user?.nombre || "Estudiante"}
+            onNavigate={handleNavigate}
+            onLogout={handleLogout}
+          />
+        )
+      case "student-history":
+        return (
+          <StudentHistory
+            userName={user?.nombre || "Estudiante"}
+            onNavigate={handleNavigate}
+            onLogout={handleLogout}
+          />
+        )
+
+      // --- MAESTRO ---
+      case "teacher-dashboard":
+        return (
+          <TeacherDashboard
+            userName={user?.nombre || "Maestro"}
+            onNavigate={handleNavigate}
+            onLogout={handleLogout}
+          />
+        )
+      case "teacher-attendance":
+        return (
+          <TeacherAttendance
+            userName={user?.nombre || "Maestro"}
+            onNavigate={handleNavigate}
+            onLogout={handleLogout}
+          />
+        )
+      case "teacher-schedule":
+        return (
+          <TeacherSchedule
+            userName={user?.nombre || "Maestro"}
+            onNavigate={handleNavigate}
+            onLogout={handleLogout}
+          />
+        )
+
+      default:
+        return <div className="flex h-screen items-center justify-center">Cargando...</div>
+    }
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {!userRole ? (
-        <LoginScreen onLogin={handleLogin} />
-      ) : currentScreen === "student-dashboard" ? (
-        <StudentDashboard userName={userName} onNavigate={navigateTo} onLogout={handleLogout} />
-      ) : currentScreen === "student-history" ? (
-        <StudentHistory userName={userName} onNavigate={navigateTo} onLogout={handleLogout} />
-      ) : currentScreen === "teacher-dashboard" ? (
-        <TeacherDashboard userName={userName} onNavigate={navigateTo} onLogout={handleLogout} />
-      ) : (
-        <TeacherAttendance userName={userName} onNavigate={navigateTo} onLogout={handleLogout} initialCourseId={navigationParams.courseId} />
-      )}
-    </div>
+    <main className="min-h-screen bg-background font-sans antialiased">
+      {renderScreen()}
+    </main>
   )
 }

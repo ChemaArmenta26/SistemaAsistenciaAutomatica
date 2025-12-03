@@ -39,3 +39,12 @@ export const getClasesPorFechaMaestro = async (req, res) => {
     res.status(500).json({ ok: false, message: "Error al obtener clases del maestro" });
   }
 };
+
+export const getHorarioMaestro = async (req, res) => {
+  try {
+    const horario = await ClaseService.getHorarioMaestro(req.user.id);
+    res.json({ ok: true, data: horario });
+  } catch (error) {
+    res.status(500).json({ ok: false, message: error.message });
+  }
+};

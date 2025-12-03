@@ -43,16 +43,15 @@ class ScheduleService {
 
       const inicioMin = hIni * 60 + mIni;
       const finMin = hFin * 60 + mFin;
-      const margen = h.margenDespuesMin ?? 15; // Margen para cerrar asistencia
+      const margen = h.margenDespuesMin ?? 15; 
       
-      // Ventana total permitida
       const ventanaFin = finMin + margen;
 
       if (nowMinutes >= inicioMin && nowMinutes <= ventanaFin) {
         
-        // Lógica para determinar si es Retardo
         const TOLERANCIA_RETARDO = 15; 
-        let estadoCalculado = "Registrada";
+        // CORRECCIÓN AQUÍ: Cambiamos "Registrada" por "Presente"
+        let estadoCalculado = "Presente";
 
         if (nowMinutes > (inicioMin + TOLERANCIA_RETARDO)) {
             estadoCalculado = "Retardo";
@@ -67,7 +66,6 @@ class ScheduleService {
       }
     }
 
-    // Si termina el ciclo y no entró en ningún if, está fuera de rango
     return {
       ok: false,
       horario: null,

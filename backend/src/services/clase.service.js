@@ -141,6 +141,47 @@ class ClaseService {
       throw error;
     }
   }
+
+
+  static async getHorarioMaestro(idUsuario) {
+    try {
+      const maestro = await Maestro.findOne({ where: { idUsuario } });
+      if (!maestro) throw new Error("Maestro no encontrado");
+
+      // Obtenemos todas las clases del periodo actual
+      const clases = await Clase.findAll({
+        where: { 
+            idMaestro: maestro.idMaestro, 
+            periodo: "ENE-MAY 2025" // O el periodo activo configurado
+        },
+        include: [
+          { model: Aula, attributes: ['nombreAula'] },
+          { model: Horario, attributes: ['diaSemana', 'horaInicio', 'horaFin'] }
+        ]
+      });
+
+      const horarioFlat = [];
+      clases.forEach(c => {
+        c.Horarios.forEach(h => {
+          horarioFlat.push({
+            id: c.idGrupo,
+            materia: c.nombreMateria,
+            aula: c.Aula ? c.Aula.nombreAula : "Sin Aula",
+            dia: h.diaSemana, // 1=Lunes, 2=Martes...
+            horaInicio: h.horaInicio.slice(0, 5), // "07:00"
+            horaFin: h.horaFin.slice(0, 5)        // "08:00"
+          });
+        });
+      });
+
+      // Ordenar por día y hora
+      return horarioFlat.sort((a, b) => a.dia - b.dia || a.horaInicio.localeCompare(b.horaInicio));
+
+    } catch (error) {
+      console.error("Error getHorarioMaestro:", error);
+      throw error;
+    }
+  }
 }
 
 export default ClaseService;

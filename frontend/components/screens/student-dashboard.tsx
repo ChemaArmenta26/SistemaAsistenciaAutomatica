@@ -27,17 +27,14 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
   // ESTADO VISUAL: Guarda qué botones están verdes/rojos localmente
   const [localStatusUpdates, setLocalStatusUpdates] = useState<{[key: number]: string}>({})
 
-  // --- FUNCIÓN DE CARGA DE DATOS (Con limpieza) ---
   const loadData = async () => {
-    // 1. LIMPIEZA TOTAL: Borramos cualquier rastro visual del usuario anterior
     setLocalStatusUpdates({})
     setFetchError(null)
-    setClasses([]) // Limpiamos las clases visualmente mientras cargan las nuevas
+    setClasses([]) 
     
     try {
       setLoadingClasses(true)
 
-      // 2. Leer usuario fresco del Storage (ignorando cualquier estado previo)
       const userStr = localStorage.getItem("user")
       if (!userStr) throw new Error("Sesión no encontrada")
       
@@ -45,7 +42,6 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
       const currentId = user.id
       setStudentId(currentId)
 
-      // 3. Obtener clases para el usuario ACTUAL
       const data = await getClassesTodayService(currentId)
       setClasses(data)
 
@@ -59,7 +55,6 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
     }
   }
 
-  // EJECUTAR SIEMPRE QUE CAMBIE EL USUARIO (Login nuevo)
   useEffect(() => {
     loadData()
   }, [userName])
@@ -72,11 +67,8 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
 
     const promesaAsistencia = async () => {
       const coords = await obtenerUbicacion()
-      
-      // Nota: Aunque enviamos idAlumno aquí, el backend AHORA lo ignorará 
-      // y usará el del token, lo cual es mucho más seguro.
       const response = await registrarAsistenciaService({
-        idAlumno: studentId, 
+        idAlumno: studentId,
         idGrupo: classId,
         latitud: coords.latitud,
         longitud: coords.longitud,
@@ -87,24 +79,63 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
 
     toast.promise(promesaAsistencia(), {
       loading: 'Verificando ubicación y horario...',
+      
       success: (data: any) => {
-        // Usamos el estado que devuelve el backend
-        // data.estadoFinal es lo que definimos en el servicio
         const nuevoEstado = data.estadoFinal || data.asistencia?.estado || 'Registrada';
-        
-        // Actualizamos visualmente el botón
         setLocalStatusUpdates(prev => ({ ...prev, [classId]: nuevoEstado }))
-        
-        // Recargamos datos reales en background para asegurar consistencia
         setTimeout(() => loadData(), 1000)
-
-        return data.mensaje || `¡Asistencia Registrada!`
+        return data.message || data.mensaje || `¡Asistencia Registrada!`
       },
-      error: (err) => {
-        let msg = err.message
-        if (msg.includes("fuera de rango")) msg = "Estás demasiado lejos del aula 📍"
-        if (msg.includes("horario")) msg = "No es hora de clase 🕒"
-        return msg
+
+      error: (err: any) => {
+        const msg = (err.message || "").toLowerCase();
+
+        // CASO 1: Ubicación
+        if (msg.includes("lejos") || msg.includes("rango") || msg.includes("ubicación")) {
+            return (
+                <div className="flex flex-col gap-1">
+                    <span className="font-bold text-base flex items-center">
+                        📍 Ubicación Incorrecta
+                    </span>
+                    <span className="text-sm">
+                        No estás en el aula correspondiente. Acércate más e intenta de nuevo.
+                    </span>
+                </div>
+            );
+        }
+
+        // CASO 2: Horario
+        if (msg.includes("horario") || msg.includes("hora")) {
+            return (
+                <div className="flex flex-col gap-1">
+                    <span className="font-bold text-base flex items-center">
+                        🕒 Fuera de Horario
+                    </span>
+                    <span className="text-sm">
+                        La clase no está activa en este momento. Revisa tu horario.
+                    </span>
+                </div>
+            );
+        }
+
+        // CASO 3: Duplicado
+        if (msg.includes("ya registraste") || msg.includes("duplicada")) {
+             return "✅ Ya has registrado tu asistencia el día de hoy.";
+        }
+
+        // CASO 4: Permisos GPS
+        if (msg.includes("permiso") || msg.includes("denied") || msg.includes("geolocalización")) {
+            return (
+                <div className="flex flex-col gap-1">
+                    <span className="font-bold text-base">🌍 GPS Desactivado</span>
+                    <span className="text-sm">
+                        Necesitas dar permiso de ubicación a tu navegador para registrar asistencia.
+                    </span>
+                </div>
+            );
+        }
+
+        return err.message || "No se pudo registrar la asistencia.";
       },
       finally: () => {
         setLoadingActionId(null)

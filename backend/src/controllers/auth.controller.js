@@ -1,11 +1,12 @@
 import AuthService from "../services/auth.service.js";
 
-export async function login(req, res) {
+export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const token = await AuthService.login(email, password);
-    res.json(token);
+    const data = await AuthService.login(email, password);
+    res.json(data);
   } catch (error) {
-    res.status(401).json({ error: error.message });
+    console.error("Login error:", error.message);
+    res.status(401).json({ message: error.message });
   }
-}
+};

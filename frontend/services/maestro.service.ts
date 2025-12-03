@@ -31,6 +31,15 @@ export interface ReporteData {
   }[];
 }
 
+export interface ScheduleItem {
+  id: number;
+  materia: string;
+  aula: string;
+  dia: number;
+  horaInicio: string;
+  horaFin: string;
+}
+
 // Obtener las clases de un maestro para una fecha específica
 export const getTeacherClassesByDateService = async (teacherId: number, date: string): Promise<TeacherClassItem[]> => {
   const token = localStorage.getItem("token");
@@ -95,5 +104,18 @@ export const getReporteAsistenciaService = async (idGrupo: number, inicio: strin
 
   const result = await response.json();
   if (!response.ok) throw new Error(result.message || "Error al obtener reporte");
+  return result.data;
+};
+
+export const getTeacherScheduleService = async (): Promise<ScheduleItem[]> => {
+  const token = localStorage.getItem("token");
+  if (!token) throw new Error("No hay sesión.");
+
+  const response = await fetch(`${API_URL}/clases/maestro/horario`, {
+    headers: { "Authorization": `Bearer ${token}` }
+  });
+
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.message || "Error al obtener horario");
   return result.data;
 };

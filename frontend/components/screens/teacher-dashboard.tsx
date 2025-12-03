@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/header"
 import { Users, Clock, MapPin, ArrowRight } from "lucide-react"
 import { getTeacherClassesByDateService, type TeacherClassItem } from "@/services/maestro.service"
 import { toast } from "sonner"
+import { Calendar } from "lucide-react"
 
 interface TeacherDashboardProps {
   userName: string
@@ -57,6 +58,13 @@ export function TeacherDashboard({ userName, onNavigate, onLogout }: TeacherDash
             <CardHeader>
               <CardTitle>Bienvenido, {userName}</CardTitle>
               <CardDescription>Gestiona tus cursos y asistencias de hoy</CardDescription>
+              <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => onNavigate("teacher-schedule")}
+                    >
+                  <Calendar className="w-3 h-3 mr-2" /> Mi Horario
+              </Button>
             </CardHeader>
           </Card>
 
