@@ -8,7 +8,7 @@ const TIMEZONE = process.env.TZ || "America/Hermosillo";
 
 class AsistenciaService {
 
-  // Método auxiliar para limpiar duplicados y priorizar asistencia positiva
+  // Método auxiliar para limpiar duplicados y priorizar asistencia
   static _filtrarMejorAsistencia(asistencias) {
     const mapa = new Map();
 
@@ -27,20 +27,16 @@ class AsistenciaService {
         continue;
       }
 
-      // LÓGICA DE ORO: Asistencia mata Falta
       const nuevoEsPositivo = esPositivo(a.estado);
       const viejoEsPositivo = esPositivo(existente.estado);
 
       if (nuevoEsPositivo && !viejoEsPositivo) {
-        // Si el nuevo es positivo y el viejo es falta, ganamos (reemplazamos)
         mapa.set(key, a);
       } else if (nuevoEsPositivo === viejoEsPositivo) {
-        // Si son del mismo tipo, nos quedamos con el más reciente (updatedAt)
         if (new Date(a.updatedAt) > new Date(existente.updatedAt)) {
             mapa.set(key, a);
         }
       }
-      // Si el nuevo es falta y el viejo es positivo, IGNORAMOS el nuevo (no hacemos nada)
     }
 
     return Array.from(mapa.values());
@@ -103,7 +99,6 @@ class AsistenciaService {
     }
 
     if (faltasAInsertar.length > 0) {
-      // Usamos ignoreDuplicates si el dialecto lo soporta, o catch simple
       await Asistencia.bulkCreate(faltasAInsertar).catch(() => {});
     }
   }
@@ -128,7 +123,6 @@ class AsistenciaService {
         where: { idGrupo, fechaHora: { [Op.between]: [inicioDia, finDia] } }
       });
 
-      // FILTRADO INTELIGENTE: Eliminamos faltas falsas
       const asistenciasLimpias = this._filtrarMejorAsistencia(asistenciasRaw);
 
       const asistenciaMap = new Map();
@@ -167,29 +161,26 @@ class AsistenciaService {
     const inicioDia = parsedDate.startOf('day').toJSDate();
     const finDia = parsedDate.endOf('day').toJSDate();
 
-    // 1. Validar si ya existe
+    // 1. Validar Duplicidad
     const asistenciaExistente = await Asistencia.findOne({
       where: { idAlumno: idAlumno, idGrupo: idGrupo, fechaHora: { [Op.between]: [inicioDia, finDia] } }
     });
 
     if (asistenciaExistente) {
-       // Lógica de recuperación si era falta automática
        if (asistenciaExistente.estado === 'Falta') {
-           // ... (lógica de recuperación) ...
        } else {
            return { 
                exito: false, 
-               mensaje: "Ya registraste asistencia para esta clase hoy.", // Mensaje claro
+               mensaje: "Ya registraste asistencia para esta clase el día de hoy.", // Mensaje explícito
                estadoFinal: "Duplicada", 
                asistencia: asistenciaExistente 
            };
        }
     }
 
-    // 2. Validar Ubicación
+    // 2. Validar Ubicación (Con Fallback de mensaje)
     const validacionUbicacion = await UbicacionService.validarUbicacionAula(idGrupo, latitud, longitud);
     if (!validacionUbicacion.ok) {
-      // CORRECCIÓN: Aseguramos devolver un mensaje string válido
       return { 
           exito: false, 
           mensaje: validacionUbicacion.mensaje || "Estás demasiado lejos del aula.", 
@@ -198,20 +189,30 @@ class AsistenciaService {
       };
     }
 
-    // 3. Validar Horario
+    // 3. Validar Horario (Con Fallback de mensaje)
     const evalHorario = await ScheduleService.isWithinSchedule(idGrupo, parsedDate);
     if (!evalHorario.ok) {
-      // CORRECCIÓN CRÍTICA: ScheduleService devuelve 'detail', no 'mensaje'
       return { 
           exito: false, 
-          mensaje: evalHorario.detail || "No es hora de clase.", 
+          mensaje: evalHorario.detail || evalHorario.mensaje || "No es hora de clase.", 
           estadoFinal: "Fuera de horario", 
           asistencia: null 
       };
     }
 
-    // 4. Crear Asistencia
-    const estado = evalHorario.estadoSugerido;
+    // 4. Crear o Actualizar Asistencia
+    const estado = evalHorario.estadoSugerido || "Presente";
+
+    if (asistenciaExistente && asistenciaExistente.estado === 'Falta') {
+        asistenciaExistente.estado = estado;
+        asistenciaExistente.latitud = latitud;
+        asistenciaExistente.longitud = longitud;
+        asistenciaExistente.precision = precision;
+        asistenciaExistente.fechaHora = parsedDate.toJSDate();
+        await asistenciaExistente.save();
+        return { exito: true, mensaje: `Asistencia recuperada (${estado})`, asistencia: asistenciaExistente, estadoFinal: estado };
+    }
+
     const asistencia = await Asistencia.create({
       fechaHora: parsedDate.toJSDate(),
       estado,
@@ -235,17 +236,17 @@ class AsistenciaService {
     const inicioDia = fecha.startOf('day').toJSDate();
     const finDia = fecha.endOf('day').toJSDate();
     
-    // Buscamos cualquier registro del día (Falta o Presente)
+    // Buscar cualquier registro del día (Falta o Presente)
     let asistencia = await Asistencia.findOne({ 
         where: { idAlumno, idGrupo, fechaHora: { [Op.between]: [inicioDia, finDia] } } 
     });
     
     if (asistencia) { 
-        // Si existe (aunque sea Falta), lo actualizamos
+        // Si existe (aunque sea falta), actualizar
         asistencia.estado = nuevoEstado; 
         await asistencia.save(); 
     } else { 
-        // Si no existe, creamos uno nuevo
+        // Si no existe, crear uno nuevo
         asistencia = await Asistencia.create({ 
             idAlumno, 
             idGrupo, 

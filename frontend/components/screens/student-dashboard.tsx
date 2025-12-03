@@ -24,7 +24,6 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
   
   const [loadingActionId, setLoadingActionId] = useState<number | null>(null)
   
-  // ESTADO VISUAL: Guarda qué botones están verdes/rojos localmente
   const [localStatusUpdates, setLocalStatusUpdates] = useState<{[key: number]: string}>({})
 
   const loadData = async () => {
@@ -250,13 +249,13 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
             )}
 
             {!loadingClasses && classes.map((cls) => {
-              // Priorizamos la actualización local (instantánea) sobre la de la BD
+              // Priorizar la actualización local (instantánea) sobre la de la BD
               const currentStatus = localStatusUpdates[cls.id] || cls.attendanceStatus;
               
               const styles = getStatusStyles(currentStatus);
               const isLoading = loadingActionId === cls.id;
               
-              // Bloqueamos el botón si ya tiene estado o si está cargando
+              // Bloquear el botón si ya tiene estado o si está cargando
               const isActionDisabled = !!currentStatus || isLoading;
               
               return (

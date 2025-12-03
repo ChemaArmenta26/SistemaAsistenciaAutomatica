@@ -1,12 +1,12 @@
 "use client"
+
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Header } from "@/components/layout/header"
-import { Users, Clock, MapPin, ArrowRight } from "lucide-react"
+import { Users, Clock, MapPin, ArrowRight, Calendar } from "lucide-react" // Agregué Calendar
 import { getTeacherClassesByDateService, type TeacherClassItem } from "@/services/maestro.service"
 import { toast } from "sonner"
-import { Calendar } from "lucide-react"
 
 interface TeacherDashboardProps {
   userName: string
@@ -55,15 +55,18 @@ export function TeacherDashboard({ userName, onNavigate, onLogout }: TeacherDash
       <main className="max-w-3xl mx-auto p-4 pb-20">
         <div className="space-y-6">
           <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
-            <CardHeader>
-              <CardTitle>Bienvenido, {userName}</CardTitle>
-              <CardDescription>Gestiona tus cursos y asistencias de hoy</CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between pb-6">
+              <div>
+                <CardTitle>Bienvenido, {userName}</CardTitle>
+                <CardDescription className="mt-1">Gestiona tus cursos y asistencias de hoy</CardDescription>
+              </div>
               <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => onNavigate("teacher-schedule")}
-                    >
-                  <Calendar className="w-3 h-3 mr-2" /> Mi Horario
+                variant="outline" 
+                size="sm" 
+                className="bg-background/50 backdrop-blur-sm hover:bg-background"
+                onClick={() => onNavigate("teacher-schedule")}
+              >
+                <Calendar className="w-4 h-4 mr-2" /> Mi Horario
               </Button>
             </CardHeader>
           </Card>
@@ -79,6 +82,9 @@ export function TeacherDashboard({ userName, onNavigate, onLogout }: TeacherDash
               <div className="text-center py-12 border-2 border-dashed rounded-xl bg-muted/30">
                 <p className="text-xl mb-2">📅</p>
                 <p>No tienes clases asignadas para hoy.</p>
+                <Button variant="link" onClick={() => onNavigate("teacher-schedule")} className="mt-2">
+                    Ver horario semanal
+                </Button>
               </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
@@ -99,8 +105,13 @@ export function TeacherDashboard({ userName, onNavigate, onLogout }: TeacherDash
                         <div className="flex items-center gap-1.5 text-sm font-medium bg-secondary/10 px-2 py-1 rounded text-primary">
                           <Clock className="w-3.5 h-3.5" /> {course.time}
                         </div>
-                        <Button size="sm" variant="ghost" className="h-8 cursor-pointer"
-                          onClick={() => onNavigate("teacher-attendance", { courseId: course.id })}>
+                        {/* Botón que pasa el ID correctamente */}
+                        <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-8 cursor-pointer hover:bg-primary/10 hover:text-primary"
+                            onClick={() => onNavigate("teacher-attendance", { courseId: course.id })}
+                        >
                           Ver Lista <ArrowRight className="w-3 h-3 ml-1" />
                         </Button>
                       </div>

@@ -11,8 +11,9 @@ import { TeacherSchedule } from "@/components/screens/teacher-schedule"
 export default function Home() {
   const [currentScreen, setCurrentScreen] = useState("login")
   const [user, setUser] = useState<any>(null)
+  
+  const [navParams, setNavParams] = useState<any>({})
 
-  // 1. Cargar sesión al inicio
   useEffect(() => {
     const token = localStorage.getItem("token")
     const userStr = localStorage.getItem("user")
@@ -22,7 +23,6 @@ export default function Home() {
         const userData = JSON.parse(userStr)
         setUser(userData)
         
-        // Redirección automática si ya hay sesión
         if (userData.rol === "Maestro") {
           setCurrentScreen("teacher-dashboard")
         } else {
@@ -34,19 +34,23 @@ export default function Home() {
     }
   }, [])
 
-  // 2. Funciones de Navegación
-  const handleNavigate = (screen: string) => {
+  const handleNavigate = (screen: string, params?: any) => {
     setCurrentScreen(screen)
+    if (params) {
+        setNavParams(params)
+    } else {
+        setNavParams({})
+    }
   }
 
   const handleLogout = () => {
     localStorage.removeItem("token")
     localStorage.removeItem("user")
     setUser(null)
+    setNavParams({})
     setCurrentScreen("login")
   }
 
-  // Actualizar el estado del usuario inmediatamente después del login
   const handleLoginSuccess = () => {
     const userStr = localStorage.getItem("user")
     if (userStr) {
@@ -54,7 +58,6 @@ export default function Home() {
     }
   }
 
-  // 3. Renderizado de Pantallas
   const renderScreen = () => {
     switch (currentScreen) {
       case "login":
@@ -90,7 +93,7 @@ export default function Home() {
         return (
           <TeacherDashboard
             userName={user?.nombre || "Maestro"}
-            onNavigate={handleNavigate}
+            onNavigate={handleNavigate} 
             onLogout={handleLogout}
           />
         )
@@ -100,6 +103,7 @@ export default function Home() {
             userName={user?.nombre || "Maestro"}
             onNavigate={handleNavigate}
             onLogout={handleLogout}
+            initialCourseId={navParams?.courseId} 
           />
         )
       case "teacher-schedule":

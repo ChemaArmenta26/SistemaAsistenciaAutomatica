@@ -40,7 +40,6 @@ export function TeacherSchedule({ userName, onNavigate, onLogout }: TeacherSched
 
   // Función para encontrar clase en un día y hora específicos
   const getClassForSlot = (dayIndex: number, hour: number) => {
-    // dayIndex + 1 porque en BD Lunes es 1
     const targetDay = dayIndex + 1 
     
     return schedule.find(c => {

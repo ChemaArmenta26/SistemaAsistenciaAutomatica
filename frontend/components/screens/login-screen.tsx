@@ -13,7 +13,7 @@ interface LoginScreenProps {
   onNavigate: (screen: string) => void
 }
 
-// IMPORTANTE: Asegúrate de que 'onNavigate' esté entre llaves { }
+
 export function LoginScreen({ onNavigate }: LoginScreenProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -32,7 +32,7 @@ export function LoginScreen({ onNavigate }: LoginScreenProps) {
       
       toast.success(`Bienvenido, ${response.user.nombre.split(" ")[0]}`)
       
-      // Aquí es donde se llama a onNavigate
+  
       if (response.user.rol === "Maestro") {
         onNavigate("teacher-dashboard")
       } else {
