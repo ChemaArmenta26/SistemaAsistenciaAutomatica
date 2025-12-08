@@ -45,3 +45,5 @@ export const connectDB = async () => {
     console.error("Error conectando a la base de datos:", error);
   }
 };
+
+export default sequelize;
