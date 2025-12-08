@@ -28,5 +28,10 @@
     "jest": "^30.2.0",
     "nodemon": "^3.0.1",
     "supertest": "^7.1.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp"
+    ]
   }
 }
