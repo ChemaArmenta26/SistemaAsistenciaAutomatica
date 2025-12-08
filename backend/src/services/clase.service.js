@@ -1,4 +1,5 @@
 import { Clase, Alumno, Aula, Horario, Maestro, Usuario, Asistencia } from "../models/index.js";
+import AsistenciaService from "./asistencia.service.js"; 
 import { DateTime } from "luxon";
 import { Op } from "sequelize";
 
@@ -42,8 +43,14 @@ class ClaseService {
         return []; 
       }
 
+      // Sincronizar faltas para las clases de hoy
+      for (const clase of alumno.Clases) {
+          await AsistenciaService._rellenarFaltas(clase.idGrupo, now, now);
+      }
+
       const idAlumnoReal = alumno.idAlumno;
 
+      // Volvemos a consultar las asistencias (ahora ya incluirán las faltas recién generadas)
       const asistenciasHoy = await Asistencia.findAll({
         where: {
           idAlumno: idAlumnoReal,
@@ -92,6 +99,8 @@ class ClaseService {
     if (!fechaBusqueda.isValid) throw new Error("Fecha inválida");
 
     let diaSemana = fechaBusqueda.weekday;
+    // Ajuste de luxon (1-7) a modelo (0-6) si es necesario, 
+    if (diaSemana === 7) diaSemana = 0; 
 
     try {
       const maestro = await Maestro.findOne({
@@ -132,8 +141,6 @@ class ClaseService {
       throw error;
     }
   }
-
-
 }
 
 export default ClaseService;

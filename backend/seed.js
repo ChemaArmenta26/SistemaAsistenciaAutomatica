@@ -31,7 +31,7 @@ async function runSeed() {
     const aulas = await Aula.bulkCreate([
         { nombreAula: "B-201", latitud: 27.4840, longitud: -109.9891, radioPermitido: 50 },
         { nombreAula: "LV-100", latitud: 27.4499, longitud: -109.9135, radioPermitido: 50 },
-        { nombreAula: "C-304", latitud: 27.4838, longitud: -109.9895, radioPermitido: 50 },
+        { nombreAula: "C-304", latitud: 27.45002, longitud: -109.91277, radioPermitido: 50 },
         { nombreAula: "A-101", latitud: 27.4850, longitud: -109.9880, radioPermitido: 50 },
         { nombreAula: "Lab-D", latitud: 27.4842, longitud: -109.9900, radioPermitido: 50 },
     ]);

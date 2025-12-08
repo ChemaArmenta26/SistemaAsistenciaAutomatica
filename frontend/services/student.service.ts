@@ -36,11 +36,17 @@ export const getStudentStatsService = async (): Promise<StudentSubjectStats[]> =
   return result.data;
 };
 
-export const getSubjectHistoryService = async (groupId: number): Promise<AttendanceRecord[]> => {
+export const getSubjectHistoryService = async (groupId: number, startDate?: string, endDate?: string): Promise<AttendanceRecord[]> => {
   const token = localStorage.getItem("token");
   if (!token) throw new Error("No hay sesión activa.");
 
-  const response = await fetch(`${API_URL}/asistencia/alumno/historial/${groupId}`, {
+  let url = `${API_URL}/asistencia/alumno/historial/${groupId}`;
+  
+  if (startDate && endDate) {
+      url += `?fechaInicio=${startDate}&fechaFin=${endDate}`;
+  }
+
+  const response = await fetch(url, {
     headers: { 
         "Authorization": `Bearer ${token}`,
         "Cache-Control": "no-cache"

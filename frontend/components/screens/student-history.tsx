@@ -1,10 +1,9 @@
-"use client"
-
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Header } from "@/components/layout/header"
-import { ChevronLeft, CheckCircle, X, AlertCircle, FileCheck, Loader2 } from "lucide-react"
+import { ChevronLeft, CheckCircle, X, AlertCircle, FileCheck, Loader2, Search } from "lucide-react"
+import { Input } from "@/components/ui/input" // Importar Input
 import { toast } from "sonner"
 import { 
     getStudentStatsService, 
@@ -27,6 +26,11 @@ export function StudentHistory({ userName, onNavigate, onLogout }: StudentHistor
   const [history, setHistory] = useState<AttendanceRecord[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
 
+  // Estados para el filtro de fechas
+  // Default: Desde inicio de año hasta hoy (puedes ajustar el inicio según tu semestre)
+  const [startDate, setStartDate] = useState("2025-01-01")
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
+
   useEffect(() => {
     const fetchStats = async () => {
         try {
@@ -42,17 +46,28 @@ export function StudentHistory({ userName, onNavigate, onLogout }: StudentHistor
     fetchStats()
   }, [])
 
-  const handleSubjectClick = async (subject: StudentSubjectStats) => {
+  // Función auxiliar para cargar historial con filtros
+  const fetchHistory = async (subjectId: number, start: string, end: string) => {
+      setLoadingHistory(true)
       try {
-          setSelectedSubject(subject)
-          setLoadingHistory(true)
-          const records = await getSubjectHistoryService(subject.id) 
+          const records = await getSubjectHistoryService(subjectId, start, end) 
           setHistory(records)
       } catch (error: any) {
           toast.error("Error al cargar historial", { description: error.message })
-          setSelectedSubject(null) 
       } finally {
           setLoadingHistory(false)
+      }
+  }
+
+  const handleSubjectClick = (subject: StudentSubjectStats) => {
+      setSelectedSubject(subject)
+      // Cargar historial inicial con las fechas por defecto
+      fetchHistory(subject.id, startDate, endDate)
+  }
+
+  const handleFilterClick = () => {
+      if (selectedSubject) {
+          fetchHistory(selectedSubject.id, startDate, endDate)
       }
   }
 
@@ -81,7 +96,7 @@ export function StudentHistory({ userName, onNavigate, onLogout }: StudentHistor
 
         <h1 className="text-2xl font-bold mb-6">Historial Académico</h1>
 
-        {/*LISTA DE MATERIAS */}
+        {/* LISTA DE MATERIAS (Solo visible si no hay materia seleccionada) */}
         {!selectedSubject ? (
           <div className="space-y-3">
             {loadingSubjects ? (
@@ -128,14 +143,14 @@ export function StudentHistory({ userName, onNavigate, onLogout }: StudentHistor
             )}
           </div>
         ) : (
-          /* DETALLE DE HISTORIAL */
+          /* DETALLE DE HISTORIAL (Visible al seleccionar materia) */
           <div className="space-y-4">
             <Button variant="outline" size="sm" onClick={handleBackToSubjects} className="mb-2">
               <ChevronLeft className="w-4 h-4 mr-1" />
               Ver otras materias
             </Button>
 
-            <Card className="border-primary/20 bg-primary/5">
+            <Card className="border-primary/20 bg-primary/5 shadow-sm">
               <CardHeader className="py-4">
                 <CardTitle className="text-lg">{selectedSubject.name}</CardTitle>
                 <div className="text-sm text-muted-foreground flex gap-4">
@@ -144,29 +159,60 @@ export function StudentHistory({ userName, onNavigate, onLogout }: StudentHistor
               </CardHeader>
             </Card>
 
+            {/* SECCIÓN DE FILTROS DE FECHA */}
+            <div className="flex flex-col sm:flex-row gap-3 bg-muted/30 p-3 rounded-lg border">
+                <div className="flex-1">
+                    <span className="text-xs text-muted-foreground font-medium ml-1">Desde</span>
+                    <Input 
+                        type="date" 
+                        value={startDate} 
+                        onChange={(e) => setStartDate(e.target.value)} 
+                        className="bg-background h-9"
+                    />
+                </div>
+                <div className="flex-1">
+                    <span className="text-xs text-muted-foreground font-medium ml-1">Hasta</span>
+                    <Input 
+                        type="date" 
+                        value={endDate} 
+                        onChange={(e) => setEndDate(e.target.value)} 
+                        className="bg-background h-9"
+                    />
+                </div>
+                <div className="flex items-end">
+                    <Button onClick={handleFilterClick} disabled={loadingHistory} className="w-full sm:w-auto h-9">
+                        {loadingHistory ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
+                        Filtrar
+                    </Button>
+                </div>
+            </div>
+
             <div className="space-y-2">
               {loadingHistory ? (
                    <div className="text-center py-10">
                        <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+                       <p className="text-xs text-muted-foreground mt-2">Buscando registros...</p>
                    </div>
               ) : history.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">No hay asistencias registradas para esta materia.</p>
+                  <div className="text-center border-2 border-dashed rounded-lg p-8">
+                      <p className="text-muted-foreground">No hay asistencias en este rango de fechas.</p>
+                  </div>
               ) : (
                   history.map((record, idx) => (
-                    <Card key={`${record.id}-${idx}`} className="border-l-4 border-l-primary/50">
+                    <Card key={`${record.id}-${idx}`} className="border-l-4 border-l-primary/50 hover:bg-muted/10 transition-colors">
                     <CardContent className="pt-4 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                         {renderStatusIcon(record.status)}
                         <div>
                             <div className="font-medium capitalize">
-                                {new Date(record.date).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'short' })}
+                                {new Date(record.date + 'T00:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'short' })}
                             </div>
                             <div className="text-sm text-muted-foreground capitalize">
                                 {record.status}
                             </div>
                         </div>
                         </div>
-                        <span className="text-sm font-mono bg-muted px-2 py-1 rounded">
+                        <span className="text-sm font-mono bg-muted px-2 py-1 rounded text-foreground/80">
                             {record.time}
                         </span>
                     </CardContent>

@@ -7,6 +7,7 @@ import { Header } from "@/components/layout/header"
 import { ChevronLeft, Download, RefreshCw, MapPin, User, CalendarIcon } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
+import { ReportModal } from "@/components/reports/report-modal"
 import {
   getTeacherClassesByDateService,
   getGroupAttendanceListService,
@@ -38,6 +39,7 @@ export function TeacherAttendance({ userName, onNavigate, onLogout, initialCours
   const [loadingList, setLoadingList] = useState(false)
   const [loadingCourses, setLoadingCourses] = useState(false)
   const [updatingId, setUpdatingId] = useState<number | null>(null)
+  const [isReportOpen, setIsReportOpen] = useState(false)
 
   useEffect(() => {
     const loadCoursesForDate = async () => {
@@ -70,6 +72,32 @@ export function TeacherAttendance({ userName, onNavigate, onLogout, initialCours
     }
     loadCoursesForDate()
   }, [selectedDate])
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+
+    if (selectedCourseId && !loadingList) {
+        // Ejecutar actualización cada 5 segundos
+        intervalId = setInterval(() => {
+            // Llamamos al servicio silenciosamente (sin poner loadingList en true para no parpadear)
+            const fetchSilent = async () => {
+                try {
+                    const data = await getGroupAttendanceListService(Number(selectedCourseId), selectedDate);
+                    // Actualizamos solo si hay datos, React se encarga de comparar el DOM
+                    setStudents(data); 
+                } catch (e) {
+                    // Silenciamos errores de red en el polling para no molestar
+                    console.error("Error en auto-refresh", e); 
+                }
+            };
+            fetchSilent();
+        }, 5000); // 5000ms = 5 segundos
+    }
+
+    return () => {
+        if (intervalId) clearInterval(intervalId); // Limpiar intervalo al salir o cambiar curso
+    };
+  }, [selectedCourseId, selectedDate]); // Se reinicia si cambia el curso o la fecha
 
   const fetchAttendance = useCallback(async () => {
     if (!selectedCourseId) return;
@@ -127,6 +155,9 @@ export function TeacherAttendance({ userName, onNavigate, onLogout, initialCours
   const presentCount = students.filter((s) => s.estado === "Presente" || s.estado === "Retardo").length
   const absentCount = students.filter((s) => s.estado === "Falta").length
   const percentage = students.length > 0 ? Math.round((presentCount / students.length) * 100) : 0
+  
+  // Obtener el nombre del curso seleccionado para mostrarlo en el modal
+  const currentCourseName = courses.find(c => c.id.toString() === selectedCourseId)?.name || "Curso";
 
   return (
     <div className="min-h-screen bg-background">
@@ -143,11 +174,25 @@ export function TeacherAttendance({ userName, onNavigate, onLogout, initialCours
             <CardHeader className="pb-3 border-b mb-3">
               <CardTitle className="text-lg flex justify-between items-center">
                 <span>Gestión de Asistencia</span>
-                {selectedCourseId && (
-                  <Button variant="outline" size="sm" onClick={fetchAttendance} disabled={loadingList}>
-                    <RefreshCw className={`w-3 h-3 mr-2 ${loadingList ? 'animate-spin' : ''}`} /> Actualizar
-                  </Button>
-                )}
+                
+                <div className="flex gap-2">
+                    {/* Botón para abrir el reporte */}
+                    {selectedCourseId && (
+                        <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            onClick={() => setIsReportOpen(true)}
+                        >
+                            <Download className="w-3 h-3 mr-2" /> Reporte PDF
+                        </Button>
+                    )}
+
+                    {selectedCourseId && (
+                      <Button variant="outline" size="sm" onClick={fetchAttendance} disabled={loadingList}>
+                        <RefreshCw className={`w-3 h-3 mr-2 ${loadingList ? 'animate-spin' : ''}`} /> Actualizar
+                      </Button>
+                    )}
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -219,14 +264,12 @@ export function TeacherAttendance({ userName, onNavigate, onLogout, initialCours
           {/* Lista de Estudiantes (Solo mostrar si hay curso seleccionado) */}
           {selectedCourseId && (
             <Card>
-              {/* ... (contenido de la lista) ... */}
               <CardHeader className="flex flex-row items-center justify-between py-4 bg-muted/20 border-b">
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
                   <User className="w-4 h-4" /> Listado de Alumnos ({students.length})
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                {/* ... (lógica de map students) ... */}
                 {loadingList ? (
                   <div className="py-12 flex justify-center"><div className="animate-spin text-2xl">⏳</div></div>
                 ) : students.length === 0 ? (
@@ -235,7 +278,6 @@ export function TeacherAttendance({ userName, onNavigate, onLogout, initialCours
                   <div className="divide-y">
                     {students.map((student) => (
                       <div key={student.idAlumno} className="flex flex-row sm:flex-row sm:items-center justify-between p-4 hover:bg-slate-50 transition-colors gap-3">
-                        {/* ... (Renderizado del alumno) ... */}
                         <div className="flex-1">
                           <p className="font-semibold text-sm">{student.nombre}</p>
                           <p className="text-xs text-muted-foreground">{student.matricula}</p>
@@ -259,6 +301,15 @@ export function TeacherAttendance({ userName, onNavigate, onLogout, initialCours
           )}
 
         </div>
+
+        {/* Modal para generar el reporte */}
+        <ReportModal 
+            isOpen={isReportOpen} 
+            onClose={() => setIsReportOpen(false)} 
+            courseId={selectedCourseId ? Number(selectedCourseId) : null}
+            courseName={currentCourseName}
+        />
+
       </main>
     </div>
   )

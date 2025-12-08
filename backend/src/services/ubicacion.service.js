@@ -42,6 +42,11 @@ class UbicacionService {
 
       const { latitud: latAula, longitud: lonAula, radioPermitido } = grupo.Aula;
 
+
+      console.log("COMPARACIÓN DE UBICACIÓN:");
+      console.log(`Alumno (Enviado): ${latAlumno}, ${lonAlumno}`);
+      console.log(`Aula (En Base de Datos): ${latAula}, ${lonAula}`);
+
       // 2. Calcular distancia
       const distancia = this.calcularDistancia(latAlumno, lonAlumno, latAula, lonAula);
 

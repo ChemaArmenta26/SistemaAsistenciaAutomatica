@@ -18,6 +18,19 @@ export interface StudentAttendanceItem {
   metodo: string;
 }
 
+export interface ReporteData {
+  totalSesiones: number;
+  alumnos: {
+    matricula: string;
+    nombre: string;
+    presentes: number;
+    retardos: number;
+    faltas: number;
+    justificados: number;
+    porcentaje: number;
+  }[];
+}
+
 // Obtener las clases de un maestro para una fecha específica
 export const getTeacherClassesByDateService = async (teacherId: number, date: string): Promise<TeacherClassItem[]> => {
   const token = localStorage.getItem("token");
@@ -70,3 +83,17 @@ export const updateManualAttendanceService = async (data: { idAlumno: number, id
     if (!response.ok) throw new Error(result.message || "Error al actualizar");
     return result;
   };
+
+// Obtener reporte de asistencia de un grupo en un rango de fechas
+export const getReporteAsistenciaService = async (idGrupo: number, inicio: string, fin: string): Promise<ReporteData> => {
+  const token = localStorage.getItem("token");
+  if (!token) throw new Error("No hay sesión.");
+
+  const response = await fetch(`${API_URL}/asistencia/reporte/${idGrupo}?fechaInicio=${inicio}&fechaFin=${fin}`, {
+    headers: { "Authorization": `Bearer ${token}` }
+  });
+
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.message || "Error al obtener reporte");
+  return result.data;
+};

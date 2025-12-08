@@ -26,34 +26,41 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
   const [localStatusUpdates, setLocalStatusUpdates] = useState<{[key: number]: string}>({})
 
   const loadData = async () => {
-    try {
-      setLoadingClasses(true)
-      setFetchError(null)
-      
-      let currentId = studentId;
-      if (!currentId) {
-          const userStr = localStorage.getItem("user")
-          if (!userStr) return
-          const user = JSON.parse(userStr)
-          currentId = user.id
-          setStudentId(user.id)
-      }
+        setLocalStatusUpdates({}); 
+        setFetchError(null);
+        
+        // 2. Obtener ID del usuario actual desde el token nuevo
+        let currentId = null; 
+        const userStr = localStorage.getItem("user");
+        
+        if (userStr) {
+            const user = JSON.parse(userStr);
+            currentId = user.id;
+            setStudentId(user.id); // Actualizamos estado
+        } else {
+             toast.error("Sesión no válida");
+             onLogout();
+             return;
+        }
 
-      if (currentId) {
-        const data = await getClassesTodayService(currentId)
-        setClasses(data)
-      }
-    } catch (err: any) {
-      setFetchError(err.message || "No se pudo cargar tu horario.")
-      toast.error("Error cargando horario", { description: err.message })
-    } finally {
-      setLoadingClasses(false)
+        try {
+            setLoadingClasses(true);
+            if (currentId) {
+                const data = await getClassesTodayService(currentId);
+                setClasses(data);
+            }
+        } catch (err: any) {
+            setFetchError(err.message || "No se pudo cargar tu horario.");
+            toast.error("Error cargando horario", { description: err.message });
+        } finally {
+            setLoadingClasses(false);
+        }
     }
-  }
 
-  useEffect(() => {
-    loadData()
-  }, [])
+    // Este efecto se ejecuta cada vez que cambia el nombre de usuario (Login nuevo)
+    useEffect(() => {
+        loadData();
+    }, [userName]);
 
   const handleCheckAttendance = async (classId: number) => {
     if (!studentId) return toast.error("Error de sesión", { description: "Recarga la página" })
@@ -75,13 +82,17 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
     toast.promise(promesaAsistencia(), {
       loading: 'Verificando ubicación y horario...',
       success: (data: any) => {
-        let nuevoEstado = data.estadoFinal;
-        if (!nuevoEstado || nuevoEstado === 'Duplicada') {
-            nuevoEstado = data.asistencia?.estado || 'Registrada';
-        }
+        // CORRECCIÓN: Usamos 'data.estado' que es lo que devuelve el controlador.
+        // Si viene duplicada, usamos el estado de la asistencia existente.
+        const nuevoEstado = data.estado || data.asistencia?.estado || 'Registrada';
         
+        // 1. Actualización optimista inmediata (Feedback visual)
         setLocalStatusUpdates(prev => ({ ...prev, [classId]: nuevoEstado }))
-        return data.mensaje || `¡Asistencia Registrada!`
+        
+        // 2. Recarga de datos reales en segundo plano (Para asegurar consistencia en historial)
+        setTimeout(() => loadData(), 500);
+
+        return data.message || data.mensaje || `¡Asistencia Registrada!`
       },
       error: (err) => {
         if (err.message.includes("fuera de rango")) return "Estás demasiado lejos del aula 📍"
@@ -170,7 +181,7 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold">Tus Clases de Hoy</h2>
-              <Button variant="ghost" size="sm" onClick={loadData} disabled={loadingClasses}>
+              <Button variant="ghost" size="sm" onClick={() => { setLoadingClasses(true); loadData(); }} disabled={loadingClasses}>
                 <RefreshCw className={`w-4 h-4 mr-1 ${loadingClasses ? 'animate-spin' : ''}`} /> 
                 Actualizar
               </Button>
@@ -204,6 +215,7 @@ export function StudentDashboard({ userName, onNavigate, onLogout }: StudentDash
               const currentStatus = localStatusUpdates[cls.id] || cls.attendanceStatus;
               const styles = getStatusStyles(currentStatus);
               const isLoading = loadingActionId === cls.id;
+              // Deshabilitar si hay status Y no es loading (evita doble click)
               const isActionDisabled = !!currentStatus || isLoading;
               
               return (

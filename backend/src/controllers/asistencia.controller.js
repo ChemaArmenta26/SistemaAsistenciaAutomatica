@@ -88,9 +88,32 @@ export const getResumenAlumno = async (req, res) => {
 export const getHistorialGrupo = async (req, res) => {
   try {
     const { idGrupo } = req.params;
-    const historial = await AsistenciaService.getHistorialGrupo(req.user.id, idGrupo);
+    const { fechaInicio, fechaFin } = req.query; 
+
+    const historial = await AsistenciaService.getHistorialGrupo(req.user.id, idGrupo, fechaInicio, fechaFin);
     res.json({ ok: true, data: historial });
   } catch (error) {
     res.status(500).json({ ok: false, message: error.message });
+  }
+};
+
+export const getReporteAsistencias = async (req, res) => {
+  try {
+    const { idGrupo } = req.params;
+    const { fechaInicio, fechaFin } = req.query;
+
+    if (!idGrupo || !fechaInicio || !fechaFin) {
+      return res.status(400).json({ error: "Faltan parámetros: idGrupo, fechaInicio, fechaFin" });
+    }
+
+    const reporte = await AsistenciaService.getReporteRango(idGrupo, fechaInicio, fechaFin);
+
+    res.json({
+      ok: true,
+      data: reporte
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, message: "Error al generar el reporte" });
   }
 };
