@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { connectDB } from "./config/db.js";
+import { connectDB, sequelize } from "./config/db.js";
 import authRoutes from "./routes/auth.routes.js";
 import asistenciaRoutes from "./routes/asistencia.routes.js";
 import ubicacionRoutes from "./routes/ubicacion.routes.js";
@@ -46,6 +46,9 @@ const startServer = async () => {
     await connectDB();
     
     associations();
+
+    await sequelize.sync({ alter: true });
+    console.log("Tablas sincronizadas con alter: true");
     
     const PORT = process.env.PORT || 3000;
 
