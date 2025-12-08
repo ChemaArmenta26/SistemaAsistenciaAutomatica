@@ -14,7 +14,7 @@ class ScheduleService {
         return {
           ok: false,
           horario: null,
-          detail: "Fecha inválida: formato ISO esperado (YYYY-MM-DDTHH:mm:ss)"
+          detail: "Fecha inválida"
         };
       }
     } else {
@@ -31,7 +31,7 @@ class ScheduleService {
       return {
         ok: false,
         horario: null,
-        detail: "No hay horarios definidos para este grupo en este día"
+        detail: "No hay horario asignado"
       };
     }
 
@@ -43,33 +43,48 @@ class ScheduleService {
 
       const inicioMin = hIni * 60 + mIni;
       const finMin = hFin * 60 + mFin;
-      const margen = h.margenDespuesMin ?? 15; 
-      
-      const ventanaFin = finMin + margen;
 
-      if (nowMinutes >= inicioMin && nowMinutes <= ventanaFin) {
-        
-        const TOLERANCIA_RETARDO = 15; 
-        // CORRECCIÓN AQUÍ: Cambiamos "Registrada" por "Presente"
-        let estadoCalculado = "Presente";
+      const margenFin = finMin + (h.margenDespuesMin ?? 15);
 
-        if (nowMinutes > (inicioMin + TOLERANCIA_RETARDO)) {
-            estadoCalculado = "Retardo";
-        }
-
+      // 🔹 1. Intento anticipado
+      if (nowMinutes < inicioMin) {
         return {
-          ok: true,
+          ok: false,
           horario: h,
-          estadoSugerido: estadoCalculado,
-          detail: "Dentro del horario permitido"
+          detail: "La clase aún no ha comenzado"
         };
       }
+
+      // 🔹 2. Intento tardío más allá del margen
+      if (nowMinutes > margenFin) {
+        return {
+          ok: false,
+          horario: h,
+          detail: "La clase ha finalizado"
+        };
+      }
+
+      // 🔹 3. Dentro del horario permitido
+      const TOLERANCIA_RETARDO = 15;
+
+      let estadoCalculado = "Presente";
+
+      if (nowMinutes > (inicioMin + TOLERANCIA_RETARDO)) {
+        estadoCalculado = "Retardo";
+      }
+
+      return {
+        ok: true,
+        horario: h,
+        estadoSugerido: estadoCalculado,
+        detail: "Dentro del horario permitido"
+      };
     }
 
     return {
       ok: false,
       horario: null,
-      detail: "Fuera del horario permitido"
+      detail: "Fuera del rango permitido"
     };
   }
 }
