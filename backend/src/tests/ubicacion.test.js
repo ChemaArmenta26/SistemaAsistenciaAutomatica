@@ -23,7 +23,6 @@ jest.unstable_mockModule("../services/asistencia.service.js", () => ({
       }
       // Caso exitoso la ubicación es correcta
       if (latitud === 27.49133867676796 && longitud === -109.97510899127928) {
-        // Verificar duplicidad
         if (yaRegistrado) {
           return Promise.resolve({
             exito: false,

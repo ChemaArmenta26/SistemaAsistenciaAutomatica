@@ -1,11 +1,9 @@
 /**
  * PRUEBAS DE HORARIO (CP-HOR)
- * Validan la lógica de aceptación o rechazo basado en tiempos.
  */
 
 import { jest } from "@jest/globals";
 
-// Mock del ScheduleService
 jest.unstable_mockModule("../services/schedule.service.js", () => ({
   default: {
     isWithinSchedule: jest.fn((idGrupo, fechaHora) => {
@@ -35,11 +33,9 @@ jest.unstable_mockModule("../services/schedule.service.js", () => ({
 
       const tiempoEnMinutos = hora * 60 + minutos;
 
-      // Horario de clase: 10:00 - 11:00
-      const inicioClase = 10 * 60;      // 10:00 = 600 minutos
-      const finClase = 11 * 60;         // 11:00 = 660 minutos
-      const margenDespues = finClase + 15; // 11:15 = 675 minutos
-
+      const inicioClase = 10 * 60;     
+      const finClase = 11 * 60;        
+      const margenDespues = finClase + 15; 
       // Caso 1: Muy temprano (antes de las 10:00)
       if (tiempoEnMinutos < inicioClase) {
         return Promise.resolve({
@@ -58,8 +54,7 @@ jest.unstable_mockModule("../services/schedule.service.js", () => ({
         });
       }
 
-      // Caso 3: Dentro del horario (10:00 - 11:15)
-      const toleranciaRetardo = inicioClase + 15; // 10:15
+      const toleranciaRetardo = inicioClase + 15; 
       const estadoSugerido = tiempoEnMinutos > toleranciaRetardo ? "Retardo" : "Presente";
 
       return Promise.resolve({
@@ -72,20 +67,17 @@ jest.unstable_mockModule("../services/schedule.service.js", () => ({
   }
 }));
 
-// Mock del UbicacionService (siempre válido para estas pruebas)
 jest.unstable_mockModule("../services/ubicacion.service.js", () => ({
   default: {
     validarUbicacionAula: jest.fn(() => Promise.resolve({ ok: true }))
   }
 }));
 
-// Mock del AsistenciaService
 jest.unstable_mockModule("../services/asistencia.service.js", () => ({
   default: {
     registrarAsistencia: jest.fn(async (data) => {
       const { fechaHora } = data;
       
-      // Importar el mock de ScheduleService
       const ScheduleService = (await import("../services/schedule.service.js")).default;
       const evalHorario = await ScheduleService.isWithinSchedule(data.idGrupo, fechaHora);
       
@@ -121,7 +113,7 @@ const app = express();
 app.use(express.json());
 app.post("/api/asistencia", register);
 
-// 🔹 CP-HOR-01 — Registro válido dentro de horario (10:20)
+// CP-HOR-01 — Registro válido dentro de horario (10:20)
 test("CP-HOR-01 Registro en Horario Válido", async () => {
   const fecha = new Date("2025-03-01T10:20:00");
   const response = await request(app).post("/api/asistencia").send({
@@ -136,7 +128,7 @@ test("CP-HOR-01 Registro en Horario Válido", async () => {
   expect(response.body.exito).toBe(true);
 });
 
-// 🔹 CP-HOR-02 — Intento anticipado (9:40, antes de las 10:00)
+// CP-HOR-02 — Intento anticipado (9:40, antes de las 10:00)
 test("CP-HOR-02 Intento Anticipado (Muy temprano)", async () => {
   const fecha = new Date("2025-03-01T09:40:00");
   const response = await request(app).post("/api/asistencia").send({
@@ -152,7 +144,7 @@ test("CP-HOR-02 Intento Anticipado (Muy temprano)", async () => {
   expect(response.body.mensaje || response.body.message).toContain("no ha comenzado");
 });
 
-// 🔹 CP-HOR-03 — Intento tardío (11:40, después del margen)
+// CP-HOR-03 — Intento tardío (11:40, después del margen)
 test("CP-HOR-03 Intento tardío (Clase finalizada)", async () => {
   const fecha = new Date("2025-03-01T11:40:00");
   const response = await request(app).post("/api/asistencia").send({
@@ -168,7 +160,7 @@ test("CP-HOR-03 Intento tardío (Clase finalizada)", async () => {
   expect(response.body.mensaje || response.body.message).toContain("finalizado");
 });
 
-// 🔹 CP-HOR-04 — Registro con retardo pero dentro del margen (10:20)
+// CP-HOR-04 — Registro con retardo pero dentro del margen (10:20)
 test("CP-HOR-04 Registro dentro del retardo permitido", async () => {
   const fecha = new Date("2025-03-01T10:20:00");
   const response = await request(app).post("/api/asistencia").send({

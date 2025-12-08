@@ -19,7 +19,7 @@ describe("Pruebas de Autenticación (CP-AUTH)", () => {
   // CP-AUTH-01: Login correcto de un alumno
   test("CP-AUTH-01: Login Exitoso (Alumno)", async () => {
     const response = await request(app).post("/api/login").send({
-      email: "alumno1@potros.itson.edu.mx", // existe en el seed
+      email: "alumno1@potros.itson.edu.mx", 
       password: "123456",
     });
 
@@ -31,7 +31,7 @@ describe("Pruebas de Autenticación (CP-AUTH)", () => {
   // CP-AUTH-02: Login correcto de un maestro
   test("CP-AUTH-02: Login Exitoso (Maestro)", async () => {
     const response = await request(app).post("/api/login").send({
-      email: "maestro1@itson.edu.mx", // existe en el seed
+      email: "maestro1@itson.edu.mx", 
       password: "123456",
     });
 
@@ -54,7 +54,7 @@ describe("Pruebas de Autenticación (CP-AUTH)", () => {
   test("CP-AUTH-04: Fallo de Servicio ITSON (Simulado)", async () => {
     const response = await request(app).post("/api/login").send({
       email: "alumno1@potros.itson.edu.mx",
-      password: "", // contraseña vacía → error esperado
+      password: "", 
     });
 
     expect([401, 500]).toContain(response.status);
