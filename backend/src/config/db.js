@@ -7,7 +7,7 @@ const isRemote = process.env.DB_HOST && process.env.DB_HOST !== 'localhost' && p
 
 console.log(`Conectando a base de datos en: ${process.env.DB_HOST || 'localhost'} (Modo Seguro: ${isRemote ? 'ACTIVADO' : 'DESACTIVADO'})`);
 
-const sequelize = new Sequelize(
+export const sequelize = new Sequelize(
   process.env.DB_NAME || "sistema_asistencia",
   process.env.DB_USER || "postgres", 
   process.env.DB_PASS || "",
@@ -36,16 +36,12 @@ export const connectDB = async () => {
     await sequelize.authenticate();
     console.log("Conexión a base de datos exitosa");
     
-    if (process.env.NODE_ENV !== 'production') {
-       await sequelize.sync({ alter: true });
-       console.log("Modelos sincronizados");
-    } else {
-       console.log("Omitiendo sync en producción para velocidad");
-    }
+    
+    await sequelize.sync({ alter: true });
+    console.log("Modelos sincronizados (Forzado para corrección)");
+
     
   } catch (error) {
     console.error("Error conectando a la base de datos:", error);
   }
 };
-
-export default sequelize;
