@@ -63,7 +63,7 @@ export function TeacherDashboard({ userName, onNavigate, onLogout }: TeacherDash
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="bg-background/50 backdrop-blur-sm hover:bg-background"
+                className="bg-background/50 backdrop-blur-sm text-muted-foreground"
                 onClick={() => onNavigate("teacher-schedule")}
               >
                 <Calendar className="w-4 h-4 mr-2" /> Mi Horario

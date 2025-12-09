@@ -261,7 +261,7 @@ class AsistenciaService {
       const alumno = await Alumno.findOne({ where: { idUsuario: idUsuarioInput } });
       if (!alumno) return [];
       const inscripciones = await Inscripcion.findAll({ where: { idAlumno: alumno.idAlumno, activo: true }, include: [{ model: Clase, include: [{ model: Maestro, include: [{ model: Usuario }] }] }] });
-      const FECHA_INICIO = DateTime.fromISO("2025-01-01", { zone: TIMEZONE }); const HOY = DateTime.now().setZone(TIMEZONE);
+      const FECHA_INICIO = DateTime.fromISO("2025-08-18", { zone: TIMEZONE }); const HOY = DateTime.now().setZone(TIMEZONE);
       
       const resumen = await Promise.all(inscripciones.map(async (ins) => {
         const clase = ins.Clase;
@@ -284,7 +284,7 @@ class AsistenciaService {
   static async getHistorialGrupo(idUsuarioInput, idGrupo, fechaInicioStr, fechaFinStr) {
       const alumno = await Alumno.findOne({ where: { idUsuario: idUsuarioInput } });
       if (!alumno) return [];
-      const inicioDefault = DateTime.fromISO("2025-01-01", { zone: TIMEZONE });
+      const inicioDefault = DateTime.fromISO("2025-08-18", { zone: TIMEZONE });
       const finDefault = DateTime.now().setZone(TIMEZONE);
       const fechaInicio = fechaInicioStr ? DateTime.fromISO(fechaInicioStr, { zone: TIMEZONE }) : inicioDefault;
       const fechaFin = fechaFinStr ? DateTime.fromISO(fechaFinStr, { zone: TIMEZONE }).endOf('day') : finDefault;

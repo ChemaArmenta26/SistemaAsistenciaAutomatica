@@ -4,7 +4,7 @@ import { DateTime } from "luxon";
 import { Op } from "sequelize";
 
 const TIMEZONE = process.env.TZ || "America/Hermosillo";
-const PERIODO_ACTUAL = "ENE-MAY 2025";
+const PERIODO_ACTUAL = "AGO-DIC 2025";
 
 class ClaseService {
   
@@ -152,7 +152,7 @@ class ClaseService {
       const clases = await Clase.findAll({
         where: { 
             idMaestro: maestro.idMaestro, 
-            periodo: "ENE-MAY 2025" // O el periodo activo configurado
+            periodo: "AGO-DIC 2025"
         },
         include: [
           { model: Aula, attributes: ['nombreAula'] },

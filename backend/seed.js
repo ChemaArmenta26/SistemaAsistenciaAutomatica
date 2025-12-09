@@ -90,7 +90,7 @@ async function runSeed() {
 
         const clase = await Clase.create({
             nombreMateria: materia,
-            periodo: "ENE-MAY 2025",
+            periodo: "AGO-DIC 2025",
             idMaestro: maestro.idMaestro,
             idAula: aula.idAula
         });
