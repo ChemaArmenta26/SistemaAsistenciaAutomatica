@@ -24,7 +24,7 @@ export const registrarAsistenciaService = async (data: {
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.error || result.message || "Error al registrar asistencia");
+      throw new Error(result.error || result.message || result.mensaje || "Error al registrar asistencia");
     }
 
     return result;
